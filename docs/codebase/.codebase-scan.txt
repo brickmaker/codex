@@ -1,0 +1,643 @@
+
+=== DIRECTORY TREE (max depth 3, source files only) ===
+.agents
+.agents/skills
+.agents/skills/acquire-codebase-knowledge
+.agents/skills/acquire-codebase-knowledge/SKILL.md
+.agents/skills/acquire-codebase-knowledge/assets
+.agents/skills/acquire-codebase-knowledge/references
+.agents/skills/acquire-codebase-knowledge/scripts
+.agents/skills/architecture-blueprint-generator
+.agents/skills/architecture-blueprint-generator/SKILL.md
+.bazelignore
+.bazelrc
+.bazelversion
+.codespellignore
+.codespellrc
+.codex
+.codex/environments
+.codex/environments/environment.toml
+.codex/environments/setup.py
+.codex/skills
+.codex/skills/babysit-pr
+.codex/skills/babysit-pr/SKILL.md
+.codex/skills/babysit-pr/agents
+.codex/skills/babysit-pr/references
+.codex/skills/babysit-pr/scripts
+.codex/skills/code-review
+.codex/skills/code-review/SKILL.md
+.codex/skills/code-review-breaking-changes
+.codex/skills/code-review-breaking-changes/SKILL.md
+.codex/skills/code-review-change-size
+.codex/skills/code-review-change-size/SKILL.md
+.codex/skills/code-review-context
+.codex/skills/code-review-context/SKILL.md
+.codex/skills/code-review-testing
+.codex/skills/code-review-testing/SKILL.md
+.codex/skills/codex-bug
+.codex/skills/codex-bug/SKILL.md
+.codex/skills/codex-issue-digest
+.codex/skills/codex-issue-digest/SKILL.md
+.codex/skills/codex-issue-digest/agents
+.codex/skills/codex-issue-digest/scripts
+.codex/skills/codex-pr-body
+.codex/skills/codex-pr-body/SKILL.md
+.codex/skills/path-types
+.codex/skills/path-types/SKILL.md
+.codex/skills/pushing-ci-changes
+.codex/skills/pushing-ci-changes/SKILL.md
+.codex/skills/remote-tests
+.codex/skills/remote-tests/SKILL.md
+.codex/skills/test-tui
+.codex/skills/test-tui/SKILL.md
+.codex/skills/update-v8-version
+.codex/skills/update-v8-version/SKILL.md
+.codex/skills/update-v8-version/agents
+.devcontainer
+.devcontainer/Dockerfile
+.devcontainer/Dockerfile.secure
+.devcontainer/README.md
+.devcontainer/codex-install
+.devcontainer/codex-install/package.json
+.devcontainer/codex-install/pnpm-lock.yaml
+.devcontainer/codex-install/pnpm-workspace.yaml
+.devcontainer/devcontainer.json
+.devcontainer/devcontainer.secure.json
+.devcontainer/init-firewall.sh
+.devcontainer/post-start.sh
+.devcontainer/post_install.py
+.gitattributes
+.github
+.github/CODEOWNERS
+.github/ISSUE_TEMPLATE
+.github/ISSUE_TEMPLATE/1-codex-app.yml
+.github/ISSUE_TEMPLATE/2-extension.yml
+.github/ISSUE_TEMPLATE/3-cli.yml
+.github/ISSUE_TEMPLATE/4-bug-report.yml
+.github/ISSUE_TEMPLATE/5-feature-request.yml
+.github/ISSUE_TEMPLATE/6-docs-issue.yml
+.github/actions
+.github/actions/linux-code-sign
+.github/actions/linux-code-sign/action.yml
+.github/actions/prepare-bazel-ci
+.github/actions/prepare-bazel-ci/action.yml
+.github/actions/run-argument-comment-lint
+.github/actions/run-argument-comment-lint/action.yml
+.github/actions/setup-akv-pkcs11-codesigning
+.github/actions/setup-akv-pkcs11-codesigning/action.yaml
+.github/actions/setup-bazel-ci
+.github/actions/setup-bazel-ci/action.yml
+.github/actions/setup-msvc-env
+.github/actions/setup-msvc-env/action.yml
+.github/actions/setup-msvc-env/setup-msvc-env.ps1
+.github/actions/setup-rusty-v8
+.github/actions/setup-rusty-v8/action.yml
+.github/actions/windows-code-sign
+.github/actions/windows-code-sign/action.yml
+.github/blob-size-allowlist.txt
+.github/codex
+.github/codex/home
+.github/codex/home/config.toml
+.github/codex/labels
+.github/codex/labels/codex-attempt.md
+.github/codex/labels/codex-review.md
+.github/codex/labels/codex-rust-review.md
+.github/codex/labels/codex-triage.md
+.github/codex-cli-splash.png
+.github/dependabot.yaml
+.github/dotslash-argument-comment-lint-config.json
+.github/dotslash-config.json
+.github/dotslash-zsh-config.json
+.github/pull_request_template.md
+.github/scripts
+.github/scripts/archive-release-symbols-and-strip-binaries.sh
+.github/scripts/build-codex-package-archive.sh
+.github/scripts/build-zsh-release-artifact.sh
+.github/scripts/compute-bazel-windows-path.ps1
+.github/scripts/install-musl-build-tools.sh
+.github/scripts/macos-signing
+.github/scripts/macos-signing/codex.entitlements.plist
+.github/scripts/macos-signing/notarize_macos_binary_with_rcodesign.sh
+.github/scripts/macos-signing/notarize_macos_dmg_with_rcodesign.sh
+.github/scripts/macos-signing/sign_macos_code.sh
+.github/scripts/run-argument-comment-lint-bazel.sh
+.github/scripts/run-bazel-ci.sh
+.github/scripts/run-bazel-query-ci.sh
+.github/scripts/run_bazel_with_buildbuddy.py
+.github/scripts/rusty_v8_bazel.py
+.github/scripts/rusty_v8_module_bazel.py
+.github/scripts/setup-dev-drive.ps1
+.github/scripts/test_run_bazel_with_buildbuddy.py
+.github/scripts/test_rusty_v8_bazel.py
+.github/scripts/test_v8_canary_changes.py
+.github/scripts/v8_canary_changes.py
+.github/scripts/verify_bazel_clippy_lints.py
+.github/scripts/verify_cargo_workspace_manifests.py
+.github/scripts/verify_tui_core_boundary.py
+.github/workflows
+.github/workflows/Dockerfile.bazel
+.github/workflows/README.md
+.github/workflows/bazel.yml
+.github/workflows/blob-size-policy.yml
+.github/workflows/cargo-deny.yml
+.github/workflows/ci.yml
+.github/workflows/cla.yml
+.github/workflows/close-stale-contributor-prs.yml
+.github/workflows/codespell.yml
+.github/workflows/issue-deduplicator.yml
+.github/workflows/issue-labeler.yml
+.github/workflows/issue-translator.yml
+.github/workflows/python-runtime-build.yml
+.github/workflows/python-runtime-release.yml
+.github/workflows/python-sdk-release.yml
+.github/workflows/rust-ci-full-nextest-platform.yml
+.github/workflows/rust-ci-full.yml
+.github/workflows/rust-ci.yml
+.github/workflows/rust-release-argument-comment-lint.yml
+.github/workflows/rust-release-prepare.yml
+.github/workflows/rust-release-windows.yml
+.github/workflows/rust-release-zsh.yml
+.github/workflows/rust-release.yml
+.github/workflows/rusty-v8-release.yml
+.github/workflows/sdk.yml
+.github/workflows/v8-canary.yml
+.github/workflows/zstd
+.gitignore
+.markdownlint-cli2.yaml
+.npmrc
+.prettierignore
+.prettierrc.toml
+.vscode
+.vscode/extensions.json
+.vscode/launch.json
+.vscode/settings.json
+AGENTS.md
+BUILD.bazel
+CHANGELOG.md
+LICENSE
+MODULE.bazel
+MODULE.bazel.lock
+NOTICE
+README.md
+SECURITY.md
+announcement_tip.toml
+bazel
+bazel/modules
+bazel/modules/BUILD.bazel
+bazel/modules/wine.MODULE.bazel
+bazel/platforms
+bazel/platforms/BUILD.bazel
+bazel/platforms/release_binaries.bzl
+bazel/rules
+bazel/rules/testing
+bazel/rules/testing/BUILD.bazel
+bazel/rules/testing/foreign_platform_binary.bzl
+bazel/rules/testing/wine
+cliff.toml
+codex-cli
+codex-cli/.gitignore
+codex-cli/package.json
+codex-cli/scripts
+codex-cli/scripts/README.md
+codex-cli/scripts/build_npm_package.py
+
+=== STACK DETECTION (manifest files) ===
+
+--- BUILD.bazel ---
+load("@apple_support//xcode:xcode_config.bzl", "xcode_config")
+
+xcode_config(name = "disable_xcode")
+
+# We mark the local platform as glibc-compatible so that rust can grab a toolchain for us.
+# TODO(zbarsky): Upstream a better libc constraint into rules_rust.
+# We only enable this on linux though for sanity, and because it breaks remote execution.
+platform(
+    name = "local_linux",
+    constraint_values = [
+        # We mark the local platform as glibc-compatible because musl-built rust cannot dlopen proc macros.
+        "@llvm//constraints/libc:gnu.2.28",
+    ],
+    parents = ["@platforms//host"],
+)
+
+platform(
+    name = "local_windows",
+    constraint_values = [
+        "@rules_rs//rs/experimental/platforms/constraints:windows_gnullvm",
+    ],
+    parents = ["@platforms//host"],
+)
+
+platform(
+    name = "local_windows_msvc",
+    constraint_values = [
+        "@rules_rs//rs/experimental/platforms/constraints:windows_msvc",
+    ],
+    parents = ["@platforms//host"],
+)
+
+platform(
+    name = "windows_x86_64_gnullvm",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+        "@rules_rs//rs/experimental/platforms/constraints:windows_gnullvm",
+    ],
+)
+
+platform(
+    name = "windows_x86_64_msvc",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+        "@rules_rs//rs/experimental/platforms/constraints:windows_msvc",
+    ],
+)
+
+toolchain(
+    name = "windows_gnullvm_tests_on_msvc_host_toolchain",
+    exec_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+        "@rules_rs//rs/experimental/platforms/constraints:windows_msvc",
+    ],
+    target_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+        "@rules_rs//rs/experimental/platforms/constraints:windows_gnullvm",
+    ],
+    toolchain = "@bazel_tools//tools/test:empty_toolchain",
+    toolchain_type = "@bazel_tools//tools/test:default_test_toolchain_type",
+)
+
+alias(
+    name = "rbe",
+    actual = "@rbe_platform",
+)
+
+exports_files([
+    "AGENTS.md",
+    "workspace_root_test_launcher.bat.tpl",
+    "workspace_root_test_launcher.sh.tpl",
+])
+
+--- justfile ---
+set working-directory := "codex-rs"
+set positional-arguments
+export JUST_SHELL := justfile_directory() / "scripts/just-shell.py"
+set shell := ["python3", "-c", 'import os, runpy; runpy.run_path(os.environ["JUST_SHELL"], run_name="__main__")']
+set windows-shell := ["python", "-c", 'import os, runpy; runpy.run_path(os.environ["JUST_SHELL"], run_name="__main__")']
+
+rust_min_stack := "8388608" # 8 MiB
+python := if os_family() == "windows" { "python" } else { "python3" }
+
+# Display help
+help:
+    just -l
+
+# `codex`
+alias c := codex
+codex *args:
+    cargo run --bin codex -- {args}
+
+# `codex exec`
+exec *args:
+    cargo run --bin codex -- exec {args}
+
+# Start `codex exec-server` and run codex-tui.
+[no-cd]
+[positional-arguments]
+[unix]
+tui-with-exec-server *args:
+    {{ justfile_directory() }}/scripts/run_tui_with_exec_server.sh "$@"
+
+# Run the CLI version of the file-search crate.
+file-search *args:
+    cargo run --bin codex-file-search -- {args}
+
+# Build the CLI and run the app-server test client
+app-server-test-client *args:
+    cargo build -p codex-cli
+    cargo run -p codex-app-server-test-client -- --codex-bin ./target/debug/codex {args}
+
+# Format the justfile, Rust, Bazel/Starlark, Python SDK code, and Python scripts.
+fmt:
+    {{ python }} ../scripts/format.py
+
+# Check formatting without modifying files.
+fmt-check:
+    {{ python }} ../scripts/format.py --check
+
+fix *args:
+    cargo clippy --fix --tests --allow-dirty {args}
+
+clippy *args:
+    cargo clippy --tests {args}
+
+[unix]
+install:
+    rustup show active-toolchain
+    cargo fetch
+
+[windows]
+install:
+    #!powershell.exe -File
+    $pwsh = Get-Command pwsh.exe -ErrorAction SilentlyContinue
+    if (-not $pwsh) {
+        winget install --exact --id Microsoft.PowerShell --source winget --accept-package-agreements --accept-source-agreements
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
+    rustup show active-toolchain
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    cargo fetch
+    exit $LASTEXITCODE
+
+# Run nextest with --no-fail-fast so all tests are run.
+#
+# Run `cargo install --locked cargo-nextest` if you don't have it installed.
+# Prefer this for routine local runs. Workspace crate features are banned, so
+# there should be no need to add `--all-features`.
+[unix]
+test *args:
+    RUST_MIN_STACK={{ rust_min_stack }} NEXTEST_PROFILE=local cargo nextest run --no-fail-fast "$@"
+
+[windows]
+
+[TRUNCATED] Showing first 80 of 176 lines.
+--- package.json ---
+{
+  "name": "codex-monorepo",
+  "private": true,
+  "description": "Tools for repo-wide maintenance.",
+  "scripts": {
+    "format": "prettier --check *.json *.md docs/*.md .github/workflows/*.yml **/*.js",
+    "format:fix": "prettier --write *.json *.md docs/*.md .github/workflows/*.yml **/*.js",
+    "write-hooks-schema": "cargo run --manifest-path ./codex-rs/Cargo.toml -p codex-hooks --bin write_hooks_schema_fixtures"
+  },
+  "devDependencies": {
+    "prettier": "^3.5.3"
+  },
+  "resolutions": {
+    "@modelcontextprotocol/sdk": "1.26.0",
+    "braces": "^3.0.3",
+    "flatted": "3.4.2",
+    "glob@10.4.5": "10.5.0",
+    "handlebars": "4.7.9",
+    "micromatch": "^4.0.8",
+    "minimatch@3.1.2": "3.1.4",
+    "minimatch@9.0.5": "9.0.7",
+    "path-to-regexp": "8.4.0",
+    "picomatch@2.3.1": "2.3.2",
+    "picomatch@4.0.3": "4.0.4",
+    "rollup": "4.59.0",
+    "semver": "^7.7.1"
+  },
+  "overrides": {
+    "punycode": "^2.3.1"
+  },
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=10.33.0"
+  },
+  "packageManager": "pnpm@10.33.0+sha512.10568bb4a6afb58c9eb3630da90cc9516417abebd3fabbe6739f0ae795728da1491e9db5a544c76ad8eb7570f5c4bb3d6c637b2cb41bfdcdb47fa823c8649319"
+}
+
+--- pnpm-lock.yaml ---
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+overrides:
+  '@modelcontextprotocol/sdk': 1.26.0
+  braces: ^3.0.3
+  flatted: 3.4.2
+  glob@10.4.5: 10.5.0
+  handlebars: 4.7.9
+  micromatch: ^4.0.8
+  minimatch@3.1.2: 3.1.4
+  minimatch@9.0.5: 9.0.7
+  path-to-regexp: 8.4.0
+  picomatch@2.3.1: 2.3.2
+  picomatch@4.0.3: 4.0.4
+  rollup: 4.59.0
+  semver: ^7.7.1
+
+importers:
+
+  .:
+    devDependencies:
+      prettier:
+        specifier: ^3.5.3
+        version: 3.5.3
+
+  codex-cli: {}
+
+  codex-rs/responses-api-proxy/npm: {}
+
+  sdk/typescript:
+    devDependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: 1.26.0
+        version: 1.26.0(zod@3.25.76)
+      '@types/jest':
+        specifier: ^29.5.14
+        version: 29.5.14
+      '@types/node':
+        specifier: ^20.19.18
+        version: 20.19.18
+      eslint:
+        specifier: ^9.36.0
+        version: 9.36.0
+      eslint-config-prettier:
+        specifier: ^9.1.2
+        version: 9.1.2(eslint@9.36.0)
+      eslint-plugin-jest:
+        specifier: ^29.0.1
+        version: 29.0.1(@typescript-eslint/eslint-plugin@8.45.0(@typescript-eslint/parser@8.45.0(eslint@9.36.0)(typescript@5.9.2))(eslint@9.36.0)(typescript@5.9.2))(eslint@9.36.0)(jest@29.7.0(@types/node@20.19.18)(ts-node@10.9.2(@types/node@20.19.18)(typescript@5.9.2)))(typescript@5.9.2)
+      eslint-plugin-node-import:
+        specifier: ^1.0.5
+        version: 1.0.5(eslint@9.36.0)
+      jest:
+        specifier: ^29.7.0
+        version: 29.7.0(@types/node@20.19.18)(ts-node@10.9.2(@types/node@20.19.18)(typescript@5.9.2))
+      prettier:
+        specifier: ^3.6.2
+        version: 3.6.2
+      ts-jest:
+        specifier: ^29.3.4
+        version: 29.4.4(@babel/core@7.28.4)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.28.4))(esbuild@0.25.10)(jest-util@29.7.0)(jest@29.7.0(@types/node@20.19.18)(ts-node@10.9.2(@types/node@20.19.18)(typescript@5.9.2)))(typescript@5.9.2)
+      ts-jest-mock-import-meta:
+        specifier: ^1.3.1
+        version: 1.3.1(ts-jest@29.4.4(@babel/core@7.28.4)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.28.4))(esbuild@0.25.10)(jest-util@29.7.0)(jest@29.7.0(@types/node@20.19.18)(ts-node@10.9.2(@types/node@20.19.18)(typescript@5.9.2)))(typescript@5.9.2))
+      ts-node:
+        specifier: ^10.9.2
+        version: 10.9.2(@types/node@20.19.18)(typescript@5.9.2)
+      tsup:
+        specifier: ^8.5.0
+        version: 8.5.0(postcss@8.5.6)(typescript@5.9.2)(yaml@2.8.1)
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+      typescript-eslint:
+        specifier: ^8.45.0
+        version: 8.45.0(eslint@9.36.0)(typescript@5.9.2)
+
+[TRUNCATED] Showing first 80 of 5249 lines.
+
+=== ENTRY POINTS ===
+No common entry points found. Check 'main' or 'scripts.start' in manifest files above.
+
+=== LINTING AND FORMATTING CONFIG ===
+No linting or formatting config files found in project root.
+
+=== ENVIRONMENT VARIABLE TEMPLATES ===
+No .env.example or .env.template found. Identify required environment variables by searching the code and config for environment variable reads.
+
+=== TODO / FIXME / HACK (production code only, test dirs excluded) ===
+codex-rs/rmcp-client/src/rmcp_client.rs:1148: // TODO(aibrahim): teach OAuth bootstrap and refresh to use the same
+codex-rs/app-server-transport/src/transport/remote_control/client_tracker.rs:110: // TODO(ruslan): delete this fallback once all clients are updated to send stream_id.
+codex-rs/codex-mcp/src/rmcp_client.rs:570: startup_timeout: Option<Duration>, // TODO: cancel_token should handle this.
+codex-rs/codex-mcp/src/rmcp_client.rs:612: // TODO(starr): Unify local stdio MCP launch with
+codex-rs/network-proxy/src/proxy.rs:584: // TODO(winston): Materialize policy-checked per-child bundles for readable
+codex-rs/tools/src/tool_spec.rs:30: // TODO: Understand why we get an error on web_search although the API docs
+codex-rs/tools/src/responses_api.rs:29: /// TODO: Validation. When strict is set to true, the JSON schema,
+codex-rs/core/src/codex_delegate.rs:689: // TODO(ccunningham): Support delegated MCP approval elicitations here too after
+codex-rs/core/src/exec.rs:349: // TODO: Should arg0 be set on the ExecRequest that is returned?
+codex-rs/core/src/connectors.rs:185: // TODO: Wire callers that already own an EnvironmentManager into
+codex-rs/core/src/thread_manager.rs:120: // TODO(ccunningham): Add an explicit non-interrupting live-turn snapshot once
+codex-rs/core/src/thread_manager.rs:651: // TODO(jif) merge with fork_agent
+codex-rs/core/src/mcp_openai_file.rs:125: // TODO(anp): Resolve app tool file arguments using the selected environment's native path
+codex-rs/core/src/session_prefix.rs:19: // TODO(jif) unify with structured schema
+codex-rs/core/src/agents_md_tests.rs:758: // TODO(anp): Add an aggregate cap across environments instead of allowing the combined
+codex-rs/core/src/safety.rs:54: // TODO(ragona): I'm not sure this is actually correct? I believe in this case
+codex-rs/core/src/environment_selection.rs:225: // TODO(anp): Migrate local-environment consumers to PathUri so this compatibility
+codex-rs/core/src/realtime_conversation.rs:716: // TODO(pbakkum): Remove the realtimeapi/AVAS branch once WebRTC realtime sessions always use AVAS.
+codex-rs/core/src/realtime_conversation.rs:1107: // TODO(aibrahim): Remove this temporary fallback once realtime auth no longer
+codex-rs/core/src/realtime_conversation.rs:1360: // TODO(guinness): Use the new client event for standalone handoffs once the API changes are complete.
+codex-rs/core/src/agents_md.rs:56: // TODO(anp): Migrate AGENTS.md discovery to PathUri so instructions can be loaded from
+codex-rs/core/src/shell_snapshot.rs:79: // TODO(anp): Migrate shell snapshot creation to accept PathUri and defer native
+codex-rs/core/src/tasks/user_shell.rs:114: // TODO(ccunningham): After TurnStarted, emit model-visible turn context diffs for
+codex-rs/core/src/tasks/user_shell.rs:147: // TODO(anp): Migrate user-shell events and execution plumbing to PathUri so this local-only
+codex-rs/core/src/tasks/user_shell.rs:208: // TODO(zhao-oai): Now that we have ExecExpiration::Cancellation, we
+codex-rs/core/src/tasks/mod.rs:613: // TODO(jif): drop this
+codex-rs/core/src/tools/events.rs:409: // TODO: We should add a new ToolError variant for user-declined approvals.
+codex-rs/core/src/tools/network_approval.rs:294: // TODO: Carry blocked-request attribution so concurrent active calls can be handled safely.
+codex-rs/core/src/tools/spec_plan.rs:287: // TODO: Remove hosted image generation once the standalone extension is ready.
+codex-rs/core/src/tools/handlers/view_image.rs:146: // TODO(anp): Resolve tool paths using the selected environment's native path convention
+codex-rs/core/src/tools/handlers/extension_tools.rs:117: // TODO(anp): Migrate extension ToolEnvironment and granted-permission lookup to PathUri
+codex-rs/core/src/tools/handlers/request_permissions.rs:73: // TODO(anp): Migrate request_permissions parsing and permission profiles to PathUri so
+codex-rs/core/src/tools/handlers/shell_spec.rs:196: - recursive grep: "Get-ChildItem -Path C:\\myrepo -Recurse | Select-String -Pattern 'TODO' -CaseSensitive"
+codex-rs/core/src/tools/handlers/apply_patch.rs:366: // TODO(anp): Migrate apply-patch verification and permission accounting to PathUri so
+codex-rs/core/src/tools/handlers/plan.rs:86: "update_plan is a TODO/checklist tool and is not allowed in Plan mode".to_string(),
+codex-rs/core/src/tools/handlers/shell_spec_tests.rs:216: - recursive grep: "Get-ChildItem -Path C:\\myrepo -Recurse | Select-String -Pattern 'TODO' -CaseSensitive"
+codex-rs/core/src/tools/handlers/agent_jobs/spawn_agents_on_csv.rs:315: // TODO(anp): Migrate spawn_agents_on_csv filesystem access to PathUri before enabling it for
+codex-rs/core/src/tools/handlers/unified_exec/exec_command.rs:132: // TODO(anp): Resolve tool paths using the selected environment's native path convention
+codex-rs/core/src/context/environment_context.rs:567: // TODO(mbolin): Include this line if it helps the model.
+codex-rs/core/src/context_manager/updates.rs:222: // TODO(ccunningham): build_settings_update_items still does not cover every
+codex-rs/core/src/agent/control/spawn.rs:108: options: SpawnAgentOptions, // TODO(jif) drop with new fork.
+codex-rs/core/src/agent/control/spawn.rs:346: // TODO(jif) add helper for drain
+codex-rs/core/src/guardian/review_session.rs:753: // TODO(anp): Migrate guardian review thread settings to a PathUri fallback cwd so foreign
+codex-rs/core/src/session/rollout_reconstruction.rs:297: // TODO(ccunningham): if we drop support for None replacement_history compaction items,
+codex-rs/core/src/session/session.rs:94: // TODO(pakrym): Remove config from here
+codex-rs/core/src/session/session.rs:235: // TODO(aibrahim): Remove once v2 clients no longer send the legacy
+codex-rs/core/src/session/session.rs:1008: // TODO(jif): extract session to share between sub-agents
+codex-rs/core/src/session/session.rs:1124: // TODO(anp): Migrate MCP runtime cwd plumbing to PathUri so foreign environment
+codex-rs/core/src/session/review.rs:158: // TODO(ccunningham): Review turns currently rely on `spawn_task` for TurnComplete but do not
+codex-rs/core/src/session/turn.rs:150: // TODO(ccunningham): Pre-turn compaction runs before context updates and the
+codex-rs/core/src/session/turn.rs:420: // TODO(anp): Migrate git-root discovery and diff display roots to PathUri so foreign
+codex-rs/core/src/session/turn.rs:644: // TODO(anp): Migrate extension turn-input environments to PathUri so foreign cwd
+codex-rs/core/src/session/turn_context.rs:687: // TODO(anp): Migrate per-turn config and legacy TurnContext cwd consumers to PathUri so
+codex-rs/core/src/session/mod.rs:529: // TODO(anp) pull startup_warnings out of Config
+codex-rs/core/src/session/mod.rs:590: // TODO (aibrahim): Consolidate config.model and config.model_reasoning_effort into config.collaboration_mode
+codex-rs/core/src/session/mod.rs:1627: // TODO: Make context updates a pure diff of persisted previous/current TurnContextItem
+codex-rs/core/src/session/mod.rs:2186: // TODO(anp): Migrate request_permissions to support paths from foreign environments.
+codex-rs/core/src/session/mod.rs:2449: // TODO(anp): Migrate request_permissions to support paths from foreign environments.
+codex-rs/core/src/session/mcp.rs:321: // TODO(anp): Migrate MCP runtime cwd plumbing to PathUri so foreign environment cwd
+codex-rs/core-plugins/src/manager.rs:1184: // TODO: Remove this legacy remote-sync path once remote plugins have
+
+=== GIT RECENT COMMITS (last 20) ===
+d701e8e66 feat: 添加Codex源码目录结构文档及技能锁定文件
+031838176 Replace SkillsManager with SkillsService (#28705)
+5935a9061 app-server: keep the model cache warm (#28699)
+45f603302 Add join key for MAv2 inter-agent messages (#28561)
+a5229e068 Back off registry retries during exec recovery (#28546)
+cf17e1bc2 Resume exec-server sessions after disconnect (#28512)
+131519885 [codex] Persist built-in image results reported as generating (#28656)
+172b2218a core: remove redundant TurnContext and Prompt fields (#28638)
+cb15c6476 Revert thread recencyAt for sidebar ordering (#28655)
+0a3ad4c4b [codex] Test code-mode variable truncation (#28471)
+e2f074e16 code-mode: move cell state into library actor (#28599)
+1883dedc0 [codex] Support object-valued plugin MCP manifests (#28580)
+6f77491e9 thread-store: fix response fixture compilation (#28642)
+3d02c443b [codex] core: restore absolute turn context cwd (#28629)
+69bc0645a [codex] Gate remote plugin catalog by auth (#28625)
+bfe90188a Revert "Tell codex about PathUri serde compat. (#28595)" (#28627)
+fac3158c2 Add thread recencyAt for sidebar ordering (#27910)
+f0cb96bcb PAC 1 - Add system proxy feature config surface (#26706)
+a397b5988 [codex] [4/4] Simplify recommended plugin install schema (#28403)
+4c79527e3 core: render remote environment cwd natively (#28152)
+
+=== HIGH-CHURN FILES (last 90 days, top 20) ===
+ 333 codex-rs/Cargo.lock
+ 225 codex-rs/app-server-protocol/schema/json/codex_app_server_protocol.schemas.json
+ 216 codex-rs/app-server-protocol/schema/json/codex_app_server_protocol.v2.schemas.json
+ 212 codex-rs/tui/src/chatwidget.rs
+ 209 codex-rs/core/src/session/tests.rs
+ 208 codex-rs/core/src/config/mod.rs
+ 201 codex-rs/app-server/src/codex_message_processor.rs
+ 187 codex-rs/core/src/config/config_tests.rs
+ 180 codex-rs/core/src/session/mod.rs
+ 172 codex-rs/app-server/README.md
+ 161 codex-rs/core/config.schema.json
+ 155 codex-rs/tui/src/app.rs
+ 150 codex-rs/protocol/src/protocol.rs
+ 131 codex-rs/Cargo.toml
+ 125 codex-rs/app-server-protocol/src/protocol/v2.rs
+ 122 codex-rs/app-server/src/message_processor.rs
+ 122 codex-rs/tui/src/lib.rs
+ 119 codex-rs/core/src/session/session.rs
+ 118 codex-rs/core/src/session/turn.rs
+ 114 codex-rs/app-server-protocol/src/protocol/common.rs
+
+=== MONOREPO SIGNALS ===
+Monorepo tool detected: pnpm-workspace.yaml
+
+=== CODE METRICS ===
+Total files scanned: 4993
+Total lines of code: 1172210
+
+Files by language:
+  Rust: 2272
+  Other: 1990
+  TypeScript: 603
+  Python: 125
+  JavaScript: 2
+  C Header: 1
+
+Top 10 largest files:
+MODULE.bazel.lock: 1407.8KB
+.github/codex-cli-splash.png: 818.5KB
+codex-rs/tui/tests/fixtures/oss-story.jsonl: 818.4KB
+codex-rs/app-server-protocol/schema/json/codex_app_server_protocol.schemas.json: 529.6KB
+codex-rs/app-server-protocol/schema/json/codex_app_server_protocol.v2.schemas.json: 444.0KB
+codex-rs/tui/src/bottom_pane/chat_composer.rs: 425.5KB
+codex-rs/core/src/session/tests.rs: 356.5KB
+codex-rs/Cargo.lock: 353.2KB
+codex-rs/core/src/config/config_tests.rs: 332.8KB
+codex-rs/tui/src/app/tests.rs: 218.2KB
+
+=== CI/CD PIPELINES ===
+CI/CD: GitHub Actions
+
+=== CONTAINERS & ORCHESTRATION ===
+No containerization configs detected.
+
+=== SECURITY & COMPLIANCE ===
+Security: SECURITY.md
+
+=== PERFORMANCE & TESTING ===
+No performance testing configs detected.
+
+=== SCAN COMPLETE ===
