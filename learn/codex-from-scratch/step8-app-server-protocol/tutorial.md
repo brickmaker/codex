@@ -1,6 +1,6 @@
 # Step 8: App-Server Protocol
 
-本章加入一个很小的 app-server。真实 Codex 的 TUI、exec、IDE/桌面客户端都通过 app-server 风格的协议进入 core runtime。
+本章在 Step 7 的可恢复真实模型 runtime 上加入一个很小的 app-server。真实 Codex 的 TUI、exec、IDE/桌面客户端都通过 app-server 风格的协议进入 core runtime。
 
 ## 本步目标
 
@@ -33,6 +33,10 @@ flowchart TD
 ## 运行
 
 ```bash
+export OPENAI_API_KEY="你的 API key"
+export OPENAI_MODEL="你的模型名"
+export OPENAI_BASE_URL="https://api.openai.com/v1"
+
 printf '{"id":1,"method":"thread/start","params":{"cwd":"/tmp/mini-codex-step8"}}\n{"id":2,"method":"turn/start","params":{"threadId":"LAST","input":"run echo hi"}}\n' | python3 mini_codex.py server
 ```
 
@@ -40,7 +44,7 @@ printf '{"id":1,"method":"thread/start","params":{"cwd":"/tmp/mini-codex-step8"}
 
 ## 实现逻辑
 
-`MiniAppServer.handle()` 做方法分发。`ThreadManager` 管理多个 `Agent` 实例。每个 request 输出一条 response；turn 执行过程中额外输出 notification。
+`MiniAppServer.handle()` 做方法分发。`ThreadManager` 管理多个 `Agent` 实例。每个 request 输出一条 response；turn 执行过程中额外输出 notification。`thread/start` 本身不需要模型请求，`turn/start` 才会按环境变量或 CLI 参数创建 OpenAI-compatible model adapter。
 
 ## 下一步
 

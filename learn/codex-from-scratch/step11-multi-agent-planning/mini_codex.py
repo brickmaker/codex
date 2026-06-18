@@ -6,15 +6,19 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterable, Literal
+from typing import Iterable
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from mini_llm import Message, OpenAIChatModel, ToolCall, add_model_args, build_model, function_tool
 
 
-@dataclass
-class Message:
-    role: str
-    content: str
+SYSTEM_PROMPT = (
+    "You are Mini Codex. For complex work, use update_plan. Use tool_search to discover optional tools, "
+    "spawn_agent for delegated exploration, and shell for local commands."
+)
 
 
 @dataclass
@@ -24,34 +28,85 @@ class Event:
 
 
 @dataclass
-class ToolCall:
-    name: str
-    arguments: dict
-
-
-@dataclass
 class ToolResult:
     name: str
     ok: bool
     output: str
 
 
-@dataclass
-class ModelAction:
-    kind: Literal["final", "tool_call"]
-    text: str = ""
-    tool_call: ToolCall | None = None
-
-
 class ToolRegistry:
-    def __init__(self, cwd: Path) -> None:
+    def __init__(self, cwd: Path, model: OpenAIChatModel) -> None:
         self.cwd = cwd
+        self.model = model
         self.plan: list[dict] = []
         self.loaded_tools = {"shell", "update_plan", "spawn_agent", "tool_search"}
         self.discoverable = {
             "reverse": "Reverse text",
             "word_count": "Count words",
         }
+
+    def tool_specs(self) -> list[dict]:
+        specs = [
+            function_tool(
+                "shell",
+                "Run a shell command in the workspace.",
+                {"command": {"type": "string", "description": "Command to execute."}},
+                ["command"],
+            ),
+            function_tool(
+                "update_plan",
+                "Replace the current plan checklist.",
+                {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "step": {"type": "string"},
+                                "status": {"type": "string", "enum": ["pending", "in_progress", "completed"]},
+                            },
+                            "required": ["step", "status"],
+                            "additionalProperties": False,
+                        },
+                    }
+                },
+                ["items"],
+            ),
+            function_tool(
+                "tool_search",
+                "Search for optional tools and load matching tools into the registry.",
+                {"query": {"type": "string", "description": "Tool search query."}},
+                ["query"],
+            ),
+            function_tool(
+                "spawn_agent",
+                "Start a child agent for a small delegated task.",
+                {
+                    "role": {"type": "string", "description": "Child agent role name."},
+                    "task": {"type": "string", "description": "Task for the child agent."},
+                },
+                ["role", "task"],
+            ),
+        ]
+        if "reverse" in self.loaded_tools:
+            specs.append(
+                function_tool(
+                    "reverse",
+                    "Reverse text.",
+                    {"text": {"type": "string", "description": "Text to reverse."}},
+                    ["text"],
+                )
+            )
+        if "word_count" in self.loaded_tools:
+            specs.append(
+                function_tool(
+                    "word_count",
+                    "Count words in text.",
+                    {"text": {"type": "string", "description": "Text to count."}},
+                    ["text"],
+                )
+            )
+        return specs
 
     def run(self, call: ToolCall) -> ToolResult:
         if call.name == "shell":
@@ -75,7 +130,7 @@ class ToolRegistry:
         if call.name == "spawn_agent":
             role = str(call.arguments.get("role", "explorer"))
             task = str(call.arguments.get("task", ""))
-            child = Agent(role=role, tools=ToolRegistry(self.cwd))
+            child = Agent(role=role, tools=ToolRegistry(self.cwd, self.model), model=self.model)
             child_events = list(child.turn_events(task))
             final = next((event.data["answer"] for event in reversed(child_events) if event.type == "turn_completed"), "")
             return ToolResult("spawn_agent", True, f"{role} completed: {final}")
@@ -86,56 +141,23 @@ class ToolRegistry:
         return ToolResult(call.name, False, f"unknown or unloaded tool: {call.name}")
 
 
-class RuleBasedModel:
-    def __init__(self, role: str) -> None:
-        self.role = role
-
-    def next_action(self, history: list[Message]) -> ModelAction:
-        last = history[-1]
-        if last.role == "tool":
-            return ModelAction("final", text=f"{self.role} observed:\n{last.content}")
-        text = last.content.strip()
-        lowered = text.lower()
-        if lowered.startswith("plan "):
-            topic = text[5:]
-            return ModelAction(
-                "tool_call",
-                tool_call=ToolCall(
-                    "update_plan",
-                    {
-                        "items": [
-                            {"step": f"Understand {topic}", "status": "completed"},
-                            {"step": f"Implement {topic}", "status": "in_progress"},
-                            {"step": f"Verify {topic}", "status": "pending"},
-                        ]
-                    },
-                ),
-            )
-        if lowered.startswith("ask explorer "):
-            return ModelAction("tool_call", tool_call=ToolCall("spawn_agent", {"role": "explorer", "task": text.removeprefix("ask explorer ")}))
-        if lowered.startswith("find tool "):
-            return ModelAction("tool_call", tool_call=ToolCall("tool_search", {"query": text.removeprefix("find tool ")}))
-        if lowered.startswith("reverse "):
-            return ModelAction("tool_call", tool_call=ToolCall("reverse", {"text": text.split(maxsplit=1)[1]}))
-        if lowered.startswith("count words "):
-            return ModelAction("tool_call", tool_call=ToolCall("word_count", {"text": text.removeprefix("count words ")}))
-        if lowered.startswith("run "):
-            return ModelAction("tool_call", tool_call=ToolCall("shell", {"command": text[4:]}))
-        return ModelAction("final", text=f"{self.role} says: {text}")
-
-
 class Agent:
-    def __init__(self, role: str, tools: ToolRegistry) -> None:
+    def __init__(self, role: str, tools: ToolRegistry, model: OpenAIChatModel) -> None:
         self.role = role
         self.tools = tools
-        self.model = RuleBasedModel(role)
+        self.model = model
         self.history: list[Message] = []
+
+    def context(self) -> str:
+        loaded = ", ".join(sorted(self.tools.loaded_tools))
+        plan = "\n".join(f"- [{item.get('status')}] {item.get('step')}" for item in self.tools.plan) or "(none)"
+        return f"role: {self.role}\nloaded tools: {loaded}\nplan:\n{plan}"
 
     def turn_events(self, prompt: str) -> Iterable[Event]:
         self.history.append(Message("user", prompt))
         yield Event("turn_started", {"role": self.role, "input": prompt})
         while True:
-            action = self.model.next_action(self.history)
+            action = self.model.next_action(self.history, self.tools.tool_specs(), context=self.context())
             if action.kind == "final":
                 self.history.append(Message("assistant", action.text))
                 yield Event("assistant_message", {"text": action.text})
@@ -143,10 +165,12 @@ class Agent:
                 return
             call = action.tool_call
             assert call is not None
+            if action.assistant_message is not None:
+                self.history.append(action.assistant_message)
             yield Event("tool_call_started", asdict(call))
             result = self.tools.run(call)
             yield Event("tool_call_finished", asdict(result))
-            self.history.append(Message("tool", result.output))
+            self.history.append(Message("tool", result.output, tool_call_id=call.id, name=call.name))
 
 
 def render(events: Iterable[Event], jsonl: bool) -> None:
@@ -168,12 +192,14 @@ def main() -> None:
     exec_parser.add_argument("prompt")
     exec_parser.add_argument("--cwd", default=".")
     exec_parser.add_argument("--jsonl", action="store_true")
+    add_model_args(exec_parser)
     args = parser.parse_args()
 
     if args.command == "exec":
         cwd = Path(args.cwd).resolve()
         cwd.mkdir(parents=True, exist_ok=True)
-        render(Agent("main", ToolRegistry(cwd)).turn_events(args.prompt), args.jsonl)
+        model = build_model(args, SYSTEM_PROMPT)
+        render(Agent("main", ToolRegistry(cwd, model), model).turn_events(args.prompt), args.jsonl)
 
 
 if __name__ == "__main__":

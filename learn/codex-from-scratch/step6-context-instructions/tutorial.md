@@ -1,6 +1,6 @@
 # Step 6: Context And Instructions
 
-本章实现模型上下文层：除了历史消息，agent 还要把项目指令、环境摘要、权限状态、可用工具等信息交给模型。
+本章在 Step 5 的真实模型与安全工具 loop 上实现模型上下文层：除了历史消息，agent 还要把项目指令、环境摘要、权限状态、可用工具等信息交给模型。
 
 ## 本步目标
 
@@ -39,6 +39,10 @@ Codex 的关键设计是把这些模型可见信息做成有边界的 fragment�
 ## 运行
 
 ```bash
+export OPENAI_API_KEY="你的 API key"
+export OPENAI_MODEL="你的模型名"
+export OPENAI_BASE_URL="https://api.openai.com/v1"
+
 mkdir -p /tmp/mini-codex-step6
 printf 'Always answer with short sentences.\n' > /tmp/mini-codex-step6/AGENTS.md
 python3 mini_codex.py --cwd /tmp/mini-codex-step6 --once "context please"
@@ -49,7 +53,7 @@ REPL 中输入 `/context` 查看本轮会提供给模型的上下文。
 
 ## 实现逻辑
 
-`ContextManager.build()` 汇总四类信息：
+`ContextManager.build()` 汇总四类信息，并作为 OpenAI chat request 的 system context 发送给真实模型：
 
 1. system instructions。
 2. AGENTS.md 内容。

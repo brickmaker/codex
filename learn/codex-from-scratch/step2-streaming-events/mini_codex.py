@@ -6,13 +6,12 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import asdict, dataclass
+import sys
+from pathlib import Path
 from typing import Iterable
 
-
-@dataclass
-class Message:
-    role: str
-    content: str
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from mini_llm import Message, OpenAIChatModel, add_model_args, build_model
 
 
 @dataclass
@@ -21,23 +20,8 @@ class Event:
     data: dict
 
 
-class RuleBasedModel:
-    def complete(self, history: list[Message]) -> str:
-        last = history[-1].content.strip()
-        if not last:
-            return "I need a prompt before I can help."
-        if "stream" in last.lower():
-            return "Streaming lets the UI render progress while the agent is still working."
-        return f"You said: {last}"
-
-    def stream(self, history: list[Message]) -> Iterable[str]:
-        text = self.complete(history)
-        for word in text.split(" "):
-            yield word + " "
-
-
 class Agent:
-    def __init__(self, model: RuleBasedModel) -> None:
+    def __init__(self, model: OpenAIChatModel) -> None:
         self.model = model
         self.history: list[Message] = []
 
@@ -95,9 +79,10 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--once", help="Run one turn and exit.")
     parser.add_argument("--jsonl", action="store_true", help="Render events as JSON lines.")
+    add_model_args(parser)
     args = parser.parse_args()
 
-    agent = Agent(RuleBasedModel())
+    agent = Agent(build_model(args))
     if args.once is not None:
         run_turn(agent, args.once, args.jsonl)
     else:

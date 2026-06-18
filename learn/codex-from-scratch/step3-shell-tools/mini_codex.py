@@ -6,14 +6,19 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import sys
 from dataclasses import asdict, dataclass
-from typing import Iterable, Literal
+from pathlib import Path
+from typing import Iterable
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from mini_llm import Message, OpenAIChatModel, ToolCall, add_model_args, build_model, function_tool
 
 
-@dataclass
-class Message:
-    role: str
-    content: str
+SYSTEM_PROMPT = (
+    "You are Mini Codex. Answer normally when no local action is needed. "
+    "Use the shell tool when you need to inspect the current directory or run a user-requested command."
+)
 
 
 @dataclass
@@ -23,23 +28,10 @@ class Event:
 
 
 @dataclass
-class ToolCall:
-    name: str
-    arguments: dict
-
-
-@dataclass
 class ToolResult:
     name: str
     ok: bool
     output: str
-
-
-@dataclass
-class ModelAction:
-    kind: Literal["final", "tool_call"]
-    text: str = ""
-    tool_call: ToolCall | None = None
 
 
 class ShellTool:
@@ -64,6 +56,16 @@ class ToolRegistry:
     def __init__(self) -> None:
         self.tools = {ShellTool.name: ShellTool()}
 
+    def tool_specs(self) -> list[dict]:
+        return [
+            function_tool(
+                "shell",
+                "Run a shell command and return stdout, stderr, and exit status.",
+                {"command": {"type": "string", "description": "Command to execute."}},
+                ["command"],
+            )
+        ]
+
     def run(self, call: ToolCall) -> ToolResult:
         tool = self.tools.get(call.name)
         if tool is None:
@@ -71,29 +73,8 @@ class ToolRegistry:
         return tool.run(call.arguments)
 
 
-class RuleBasedModel:
-    def next_action(self, history: list[Message]) -> ModelAction:
-        last = history[-1]
-        if last.role == "tool":
-            return ModelAction(
-                "final",
-                text=f"Command finished. Output:\n{last.content or '(no output)'}",
-            )
-
-        text = last.content.strip()
-        lowered = text.lower()
-        if lowered == "pwd":
-            return ModelAction("tool_call", tool_call=ToolCall("shell", {"command": "pwd"}))
-        if lowered.startswith("run "):
-            return ModelAction(
-                "tool_call",
-                tool_call=ToolCall("shell", {"command": text[4:]}),
-            )
-        return ModelAction("final", text=f"You said: {text}")
-
-
 class Agent:
-    def __init__(self, model: RuleBasedModel, tools: ToolRegistry) -> None:
+    def __init__(self, model: OpenAIChatModel, tools: ToolRegistry) -> None:
         self.model = model
         self.tools = tools
         self.history: list[Message] = []
@@ -103,9 +84,8 @@ class Agent:
         yield Event("turn_started", {"input": user_text})
 
         while True:
-            action = self.model.next_action(self.history)
+            action = self.model.next_action(self.history, self.tools.tool_specs())
             if action.kind == "final":
-                assert action.text is not None
                 self.history.append(Message("assistant", action.text))
                 for word in action.text.split(" "):
                     yield Event("assistant_delta", {"delta": word + " "})
@@ -114,10 +94,12 @@ class Agent:
 
             call = action.tool_call
             assert call is not None
+            if action.assistant_message is not None:
+                self.history.append(action.assistant_message)
             yield Event("tool_call_started", asdict(call))
             result = self.tools.run(call)
             yield Event("tool_call_finished", asdict(result))
-            self.history.append(Message("tool", result.output))
+            self.history.append(Message("tool", result.output, tool_call_id=call.id, name=call.name))
 
     def render_history(self) -> str:
         if not self.history:
@@ -164,9 +146,10 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--once", help="Run one turn and exit.")
     parser.add_argument("--jsonl", action="store_true", help="Render events as JSON lines.")
+    add_model_args(parser)
     args = parser.parse_args()
 
-    agent = Agent(RuleBasedModel(), ToolRegistry())
+    agent = Agent(build_model(args, SYSTEM_PROMPT), ToolRegistry())
     if args.once is not None:
         run_turn(agent, args.once, args.jsonl)
     else:

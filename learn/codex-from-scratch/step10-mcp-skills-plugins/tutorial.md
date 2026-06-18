@@ -1,6 +1,6 @@
 # Step 10: MCP, Skills, And Plugins
 
-本章加入扩展系统。真实 Codex 通过 skills 注入指令，通过 plugins 提供 skill roots、MCP servers、apps 和 hooks，通过 MCP 把外部工具接入同一条工具管线。
+本章在 Step 9 的多前端真实模型 runtime 上加入扩展系统。真实 Codex 通过 skills 注入指令，通过 plugins 提供 skill roots、MCP servers、apps 和 hooks，通过 MCP 把外部工具接入同一条工具管线。
 
 ## 本步目标
 
@@ -39,6 +39,10 @@ flowchart TD
 ## 运行
 
 ```bash
+export OPENAI_API_KEY="你的 API key"
+export OPENAI_MODEL="你的模型名"
+export OPENAI_BASE_URL="https://api.openai.com/v1"
+
 python3 mini_codex.py init-sample-extension --codex-home /tmp/mini-codex-ext
 python3 mini_codex.py skills/list --codex-home /tmp/mini-codex-ext
 python3 mini_codex.py plugins/list --codex-home /tmp/mini-codex-ext
@@ -56,7 +60,7 @@ python3 mini_codex.py exec --codex-home /tmp/mini-codex-ext "reverse hello"
 }
 ```
 
-runtime 会把它变成一个 `PluginTool`。模型请求 `reverse` 时，工具执行并把结果回灌。
+runtime 会把它变成一个 OpenAI tools schema。模型请求 `reverse` 时，工具执行并把结果作为 `tool` 消息回灌。
 
 ## 下一步
 

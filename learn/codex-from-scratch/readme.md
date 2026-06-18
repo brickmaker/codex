@@ -2,7 +2,7 @@
 
 这个目录是一套“从零实现一个教学版 Codex”的分章节教程。它参考当前仓库源码、`docs/codebase/` 结构化分析文档，以及 `learn/codex-implementation-source-analysis.md`、`learn/codex-source-structure.md`，把 Codex CLI 的实现拆成一条可运行、可理解、可逐步扩展的路径。
 
-教学版代码使用 Python 标准库实现，默认不依赖真实模型 API：每一步都有一个本地规则模型，能稳定触发工具调用、流式事件、补丁、审批、持久化、MCP/skills/plugins、多 agent 等流程。这样你可以先掌握 Codex runtime 的骨架，再把模型适配器换成真实 Responses API。
+教学版代码使用 Python 标准库实现，并且每一步都接入 OpenAI 兼容的真实聊天模型。第一步先跑通“输入、历史、模型、输出”的最小链路，后续步骤都在上一步代码基础上增加或修改 runtime 能力：流式事件、工具调用、补丁、审批、持久化、app-server、MCP/skills/plugins、多 agent 等。
 
 ## 学习路径
 
@@ -56,7 +56,17 @@ flowchart TD
 
 ## 如何运行
 
-每个步骤目录都有一个 `mini_codex.py`，可以直接运行。例如：
+每个步骤目录都有一个 `mini_codex.py`，可以直接运行。所有步骤都需要先设置 OpenAI 兼容模型的环境变量：
+
+```bash
+cd learn/codex-from-scratch/step1-basic-loop
+export OPENAI_API_KEY="你的 API key"
+export OPENAI_MODEL="你的模型名"
+export OPENAI_BASE_URL="https://api.openai.com/v1"
+python3 mini_codex.py --once "hello codex"
+```
+
+后续步骤沿用同一组环境变量。例如：
 
 ```bash
 cd learn/codex-from-scratch/step3-shell-tools

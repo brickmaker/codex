@@ -1,6 +1,6 @@
 # Step 3: Shell Tools
 
-本章加入 Codex 最核心的能力之一：模型可以请求 runtime 执行 shell 命令，然后把输出交还给模型继续思考。
+本章在 Step 2 的真实模型事件流上加入 Codex 最核心的能力之一：模型可以通过 OpenAI 标准 `tool_calls` 请求 runtime 执行 shell 命令，然后把输出交还给模型继续思考。
 
 ## 本步目标
 
@@ -38,13 +38,17 @@ LLM 本身不能读取文件系统或执行命令。Codex 的做法是：模型�
 ## 运行
 
 ```bash
+export OPENAI_API_KEY="你的 API key"
+export OPENAI_MODEL="你的模型名"
+export OPENAI_BASE_URL="https://api.openai.com/v1"
+
 python3 mini_codex.py --once "run echo hello"
 python3 mini_codex.py --jsonl --once "pwd"
 ```
 
 ## 实现逻辑
 
-`RuleBasedModel.next_action()` 会根据用户输入决定是直接回答，还是发出 `ToolCall(name="shell")`。`Agent.run_turn()` 持续循环：
+`OpenAIChatModel.next_action()` 会把 `history` 和 `shell` 工具 schema 一起发给模型。模型要行动时，会返回 OpenAI 兼容的 `tool_calls`；runtime 解析为 `ToolCall(name="shell")` 并执行。`Agent.turn_events()` 持续循环：
 
 1. 请求模型下一步动作。
 2. 如果是 final，结束。

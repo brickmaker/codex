@@ -1,6 +1,6 @@
 # Step 9: Exec And TUI Frontends
 
-本章实现两个前端：非交互 `exec` 和交互式 `tui`。它们共享同一个 runtime，只是事件呈现方式不同。
+本章在 Step 8 的真实模型 app-server 上实现两个前端：非交互 `exec` 和交互式 `tui`。它们共享同一个 runtime，只是事件呈现方式不同。
 
 ## 本步目标
 
@@ -38,6 +38,10 @@ Codex 产品里有多个入口，但不应该有多个 agent 实现。真实 Cod
 ## 运行
 
 ```bash
+export OPENAI_API_KEY="你的 API key"
+export OPENAI_MODEL="你的模型名"
+export OPENAI_BASE_URL="https://api.openai.com/v1"
+
 python3 mini_codex.py exec "run echo from-exec"
 python3 mini_codex.py tui
 python3 mini_codex.py server
@@ -45,7 +49,7 @@ python3 mini_codex.py server
 
 ## 实现逻辑
 
-`MiniClient` 是一个内存版 app-server client。`exec_main()` 和 `tui_main()` 都只通过它调用 `thread/start` 与 `turn/start`，不直接碰工具和模型。
+`MiniClient` 是一个内存版 app-server client。`exec_main()` 和 `tui_main()` 都只通过它调用 `thread/start` 与 `turn/start`，不直接碰工具和模型。模型配置仍然来自 `OPENAI_*` 环境变量，也可以通过各前端上的 `--model`、`--base-url` 等参数覆盖。
 
 ## 下一步
 

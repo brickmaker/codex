@@ -1,6 +1,6 @@
 # Step 4: File Editing With Apply Patch
 
-本章加入文件编辑工具。Codex 真实实现中，模型通常用 `apply_patch` 产生结构化补丁，而不是直接用 shell 重定向覆盖文件。
+本章在 Step 3 的真实工具调用 loop 上加入文件编辑工具。Codex 真实实现中，模型通常用 `apply_patch` 产生结构化补丁，而不是直接用 shell 重定向覆盖文件。
 
 ## 本步目标
 
@@ -39,6 +39,10 @@ flowchart TD
 ## 运行
 
 ```bash
+export OPENAI_API_KEY="你的 API key"
+export OPENAI_MODEL="你的模型名"
+export OPENAI_BASE_URL="https://api.openai.com/v1"
+
 python3 mini_codex.py --cwd /tmp/mini-codex-step4 --once "write hello.txt Hello from patch"
 python3 mini_codex.py --cwd /tmp/mini-codex-step4 --once "show hello.txt"
 ```
@@ -54,7 +58,7 @@ python3 mini_codex.py --cwd /tmp/mini-codex-step4 --once "show hello.txt"
 *** End Patch
 ```
 
-`apply_patch()` 会解析每个文件操作，并限制路径必须留在 `--cwd` 下面。现在还没有审批策略，下一章会加入。
+模型通过 OpenAI `tool_calls` 选择 `shell` 或 `apply_patch`。`apply_patch()` 会解析每个文件操作，并限制路径必须留在 `--cwd` 下面。现在还没有审批策略，下一章会加入。
 
 ## 下一步
 

@@ -20,8 +20,8 @@ SPEC.loader.exec_module(step8_runtime)
 
 
 class MiniClient:
-    def __init__(self, codex_home: Path) -> None:
-        self.server = step8_runtime.MiniAppServer(step8_runtime.ThreadManager(codex_home))
+    def __init__(self, codex_home: Path, model_args: argparse.Namespace | None = None) -> None:
+        self.server = step8_runtime.MiniAppServer(step8_runtime.ThreadManager(codex_home, model_args))
 
     def request(self, method: str, params: dict) -> list[dict]:
         return self.server.handle({"id": method, "method": method, "params": params})
@@ -55,13 +55,13 @@ def render_outputs(outputs: list[dict], jsonl: bool) -> None:
 
 
 def exec_main(args: argparse.Namespace) -> None:
-    client = MiniClient(Path(args.codex_home).expanduser())
+    client = MiniClient(Path(args.codex_home).expanduser(), args)
     thread_id = client.start_thread(args.cwd)
     render_outputs(client.turn(thread_id, args.prompt), args.jsonl)
 
 
 def tui_main(args: argparse.Namespace) -> None:
-    client = MiniClient(Path(args.codex_home).expanduser())
+    client = MiniClient(Path(args.codex_home).expanduser(), args)
     thread_id = client.start_thread(args.cwd)
     print(f"mini-codex step9 TUI-lite thread={thread_id}. Type /quit.")
     while True:
@@ -76,7 +76,7 @@ def tui_main(args: argparse.Namespace) -> None:
 
 
 def server_main(args: argparse.Namespace) -> None:
-    step8_runtime.server_main(Path(args.codex_home).expanduser())
+    step8_runtime.server_main(Path(args.codex_home).expanduser(), args)
 
 
 def main() -> None:
@@ -88,12 +88,15 @@ def main() -> None:
     exec_parser.add_argument("prompt")
     exec_parser.add_argument("--cwd", default=".")
     exec_parser.add_argument("--jsonl", action="store_true")
+    step8_runtime.add_model_args(exec_parser)
 
     tui_parser = sub.add_parser("tui")
     tui_parser.add_argument("--cwd", default=".")
     tui_parser.add_argument("--jsonl", action="store_true")
+    step8_runtime.add_model_args(tui_parser)
 
-    sub.add_parser("server")
+    server_parser = sub.add_parser("server")
+    step8_runtime.add_model_args(server_parser)
     args = parser.parse_args()
 
     if args.command == "exec":

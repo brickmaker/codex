@@ -1,6 +1,6 @@
 # Step 11: Multi-Agent Planning And Dynamic Tools
 
-本章加入更接近 Codex 高级能力的结构：计划工具、动态工具搜索、子 agent。
+本章在 Step 10 的真实模型扩展系统上加入更接近 Codex 高级能力的结构：计划工具、动态工具搜索、子 agent。
 
 ## 本步目标
 
@@ -41,6 +41,10 @@ flowchart TD
 ## 运行
 
 ```bash
+export OPENAI_API_KEY="你的 API key"
+export OPENAI_MODEL="你的模型名"
+export OPENAI_BASE_URL="https://api.openai.com/v1"
+
 python3 mini_codex.py exec "plan build a small feature"
 python3 mini_codex.py exec "ask explorer inspect README"
 python3 mini_codex.py exec "find tool reverse"
@@ -53,7 +57,7 @@ python3 mini_codex.py exec "find tool reverse"
 - 已加载工具：shell、patch、plan、spawn_agent。
 - 可发现工具：通过 `tool_search` 查到后再注册。
 
-`spawn_agent` 会创建一个 child `Agent`，给它独立历史和 role，然后把摘要作为工具结果返回父 agent。
+`spawn_agent` 会创建一个 child `Agent`，给它独立历史和 role，然后把摘要作为工具结果返回父 agent。`tool_search` 会修改本地 tool registry，下一次模型请求时才把新工具 schema 暴露给模型。
 
 ## 下一步
 

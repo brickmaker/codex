@@ -11,7 +11,16 @@ import time
 import uuid
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterable, Literal
+from typing import Iterable
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from mini_llm import Message, OpenAIChatModel, ToolCall, add_model_args, build_model, function_tool
+
+
+SYSTEM_PROMPT = (
+    "You are Mini Codex, a teaching-sized local coding agent. Use runtime context, tools, plans, skills, "
+    "and child agents when useful. Return concise final answers after tool work."
+)
 
 
 @dataclass
@@ -24,21 +33,9 @@ class Config:
 
 
 @dataclass
-class Message:
-    role: str
-    content: str
-
-
-@dataclass
 class Event:
     type: str
     data: dict
-
-
-@dataclass
-class ToolCall:
-    name: str
-    arguments: dict
 
 
 @dataclass
@@ -46,13 +43,6 @@ class ToolResult:
     name: str
     ok: bool
     output: str
-
-
-@dataclass
-class ModelAction:
-    kind: Literal["final", "tool_call"]
-    text: str = ""
-    tool_call: ToolCall | None = None
 
 
 @dataclass
@@ -100,7 +90,15 @@ class RolloutStore:
         messages: list[Message] = []
         for record in self.records(thread_id):
             if record.get("type") in {"user_message", "assistant_message", "tool_message"}:
-                messages.append(Message(record["role"], record["content"]))
+                messages.append(
+                    Message(
+                        record["role"],
+                        record.get("content", ""),
+                        tool_call_id=record.get("tool_call_id"),
+                        name=record.get("name"),
+                        tool_calls=record.get("tool_calls"),
+                    )
+                )
         return messages
 
     def list_threads(self) -> list[dict]:
@@ -276,6 +274,110 @@ class ToolRegistry:
         discovered = [{"name": name, "description": desc, "status": "discoverable"} for name, desc in self.discoverable.items()]
         return builtins + self.extensions.plugin_tools() + discovered
 
+    def tool_specs(self) -> list[dict]:
+        specs: list[dict] = []
+        if "shell" in self.loaded_tools:
+            specs.append(
+                function_tool(
+                    "shell",
+                    "Run a shell command in the workspace.",
+                    {"command": {"type": "string", "description": "Command to execute."}},
+                    ["command"],
+                )
+            )
+        if "apply_patch" in self.loaded_tools:
+            specs.append(
+                function_tool(
+                    "apply_patch",
+                    "Write a file inside the workspace.",
+                    {
+                        "path": {"type": "string", "description": "Workspace-relative path."},
+                        "content": {"type": "string", "description": "Complete file content to write."},
+                    },
+                    ["path", "content"],
+                )
+            )
+        if "update_plan" in self.loaded_tools:
+            specs.append(
+                function_tool(
+                    "update_plan",
+                    "Replace the current task plan checklist.",
+                    {
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "step": {"type": "string"},
+                                    "status": {
+                                        "type": "string",
+                                        "enum": ["pending", "in_progress", "completed"],
+                                    },
+                                },
+                                "required": ["step", "status"],
+                                "additionalProperties": False,
+                            },
+                        }
+                    },
+                    ["items"],
+                )
+            )
+        if "tool_search" in self.loaded_tools:
+            specs.append(
+                function_tool(
+                    "tool_search",
+                    "Search for optional tools and load matching tools into the registry.",
+                    {"query": {"type": "string", "description": "Tool search query."}},
+                    ["query"],
+                )
+            )
+        if "spawn_agent" in self.loaded_tools:
+            specs.append(
+                function_tool(
+                    "spawn_agent",
+                    "Start a child agent for a small delegated task.",
+                    {
+                        "role": {"type": "string", "description": "Child agent role name."},
+                        "task": {"type": "string", "description": "Task for the child agent."},
+                    },
+                    ["role", "task"],
+                )
+            )
+        if "compact_context" in self.loaded_tools:
+            specs.append(function_tool("compact_context", "Compact context into a short summary.", {}, []))
+        if "get_context_remaining" in self.loaded_tools:
+            specs.append(function_tool("get_context_remaining", "Return remaining context budget.", {}, []))
+        if "request_user_input" in self.loaded_tools:
+            specs.append(
+                function_tool(
+                    "request_user_input",
+                    "Ask the user a short question.",
+                    {"question": {"type": "string", "description": "Question to ask."}},
+                    ["question"],
+                )
+            )
+        if "reverse" in self.loaded_tools:
+            specs.append(
+                function_tool("reverse", "Reverse text.", {"text": {"type": "string", "description": "Text to reverse."}}, ["text"])
+            )
+        if "word_count" in self.loaded_tools:
+            specs.append(
+                function_tool("word_count", "Count words.", {"text": {"type": "string", "description": "Text to count."}}, ["text"])
+            )
+        if "web_search" in self.loaded_tools:
+            specs.append(
+                function_tool("web_search", "Offline teaching stub for web search.", {"query": {"type": "string"}}, ["query"])
+            )
+        if "view_image" in self.loaded_tools:
+            specs.append(function_tool("view_image", "Check whether an image path exists.", {"path": {"type": "string"}}, ["path"]))
+        if "generate_image" in self.loaded_tools:
+            specs.append(
+                function_tool("generate_image", "Create a placeholder image artifact.", {"path": {"type": "string"}}, ["path"])
+            )
+        if "browser_open" in self.loaded_tools:
+            specs.append(function_tool("browser_open", "Offline teaching stub for opening a URL.", {"url": {"type": "string"}}, ["url"]))
+        return specs
+
     def run(self, call: ToolCall, context: str = "") -> ToolResult:
         decision = self.policy.check(call)
         if not self.policy.approved(decision):
@@ -347,63 +449,6 @@ class ToolRegistry:
             return ToolResult("apply_patch", False, str(exc))
 
 
-class RuleBasedModel:
-    def __init__(self, role: str = "main") -> None:
-        self.role = role
-
-    def next_action(self, history: list[Message]) -> ModelAction:
-        last = history[-1]
-        if last.role == "tool":
-            return ModelAction("final", text=f"{self.role} observed:\n{last.content}")
-        text = last.content.strip()
-        lowered = text.lower()
-        if lowered.startswith("plan "):
-            topic = text[5:]
-            return ModelAction(
-                "tool_call",
-                tool_call=ToolCall(
-                    "update_plan",
-                    {
-                        "items": [
-                            {"step": f"Understand {topic}", "status": "completed"},
-                            {"step": f"Implement {topic}", "status": "in_progress"},
-                            {"step": f"Verify {topic}", "status": "pending"},
-                        ]
-                    },
-                ),
-            )
-        if lowered.startswith("ask explorer "):
-            return ModelAction("tool_call", tool_call=ToolCall("spawn_agent", {"role": "explorer", "task": text.removeprefix("ask explorer ")}))
-        if lowered.startswith("find tool "):
-            return ModelAction("tool_call", tool_call=ToolCall("tool_search", {"query": text.removeprefix("find tool ")}))
-        if lowered.startswith("reverse "):
-            return ModelAction("tool_call", tool_call=ToolCall("reverse", {"text": text.split(maxsplit=1)[1]}))
-        if lowered.startswith("count words "):
-            return ModelAction("tool_call", tool_call=ToolCall("word_count", {"text": text.removeprefix("count words ")}))
-        if lowered.startswith("search "):
-            return ModelAction("tool_call", tool_call=ToolCall("web_search", {"query": text.removeprefix("search ")}))
-        if lowered.startswith("open "):
-            return ModelAction("tool_call", tool_call=ToolCall("browser_open", {"url": text.removeprefix("open ")}))
-        if lowered.startswith("view image "):
-            return ModelAction("tool_call", tool_call=ToolCall("view_image", {"path": text.removeprefix("view image ")}))
-        if lowered.startswith("generate image "):
-            return ModelAction("tool_call", tool_call=ToolCall("generate_image", {"path": text.removeprefix("generate image ")}))
-        if lowered.startswith("remaining context"):
-            return ModelAction("tool_call", tool_call=ToolCall("get_context_remaining", {}))
-        if lowered.startswith("compact"):
-            return ModelAction("tool_call", tool_call=ToolCall("compact_context", {}))
-        if lowered == "pwd":
-            return ModelAction("tool_call", tool_call=ToolCall("shell", {"command": "pwd"}))
-        if lowered.startswith("run "):
-            return ModelAction("tool_call", tool_call=ToolCall("shell", {"command": text[4:]}))
-        if lowered.startswith("write "):
-            parts = text.split(maxsplit=2)
-            if len(parts) < 3:
-                return ModelAction("final", text="Usage: write <path> <content>")
-            return ModelAction("tool_call", tool_call=ToolCall("apply_patch", {"path": parts[1], "content": parts[2] + "\n"}))
-        return ModelAction("final", text=f"{self.role} says: {text}")
-
-
 class Agent:
     def __init__(
         self,
@@ -412,55 +457,68 @@ class Agent:
         extensions: ExtensionManager,
         store: RolloutStore | None,
         role: str = "main",
+        model_args: argparse.Namespace | None = None,
     ) -> None:
         self.thread_id = thread_id
         self.config = config
         self.extensions = extensions
         self.store = store
         self.role = role
+        self.model_args = model_args
         self.history = store.history(thread_id) if store and thread_id else []
-        self.model = RuleBasedModel(role)
+        self.model = build_model(model_args, SYSTEM_PROMPT)
         self.context_manager = ContextManager(config, extensions)
         self.tools = ToolRegistry(config, extensions, self.child_agent)
 
     def child_agent(self, role: str) -> "Agent":
-        return Agent(None, self.config, self.extensions, None, role)
+        return Agent(None, self.config, self.extensions, None, role, self.model_args)
 
-    def record(self, role: str, content: str) -> None:
+    def record(self, message: Message) -> None:
         if self.store and self.thread_id:
-            self.store.append(
-                self.thread_id,
-                {"type": f"{role}_message", "role": role, "content": content, "ts": time.time()},
-            )
+            record = {"type": f"{message.role}_message", "role": message.role, "content": message.content, "ts": time.time()}
+            if message.tool_call_id:
+                record["tool_call_id"] = message.tool_call_id
+            if message.name:
+                record["name"] = message.name
+            if message.tool_calls:
+                record["tool_calls"] = message.tool_calls
+            self.store.append(self.thread_id, record)
 
     def context(self) -> str:
         return self.context_manager.build(self.history, self.tools.plan)
 
     def turn_events(self, prompt: str) -> Iterable[Event]:
-        self.history.append(Message("user", prompt))
-        self.record("user", prompt)
+        user_message = Message("user", prompt)
+        self.history.append(user_message)
+        self.record(user_message)
         yield Event("turn_started", {"threadId": self.thread_id, "role": self.role, "input": prompt})
         while True:
             context = self.context()
-            action = self.model.next_action(self.history)
+            action = self.model.next_action(self.history, self.tools.tool_specs(), context=context)
             if action.kind == "final":
-                self.history.append(Message("assistant", action.text))
-                self.record("assistant", action.text)
+                assistant_message = Message("assistant", action.text)
+                self.history.append(assistant_message)
+                self.record(assistant_message)
                 yield Event("assistant_message", {"text": action.text})
                 yield Event("turn_completed", {"threadId": self.thread_id, "answer": action.text})
                 return
             call = action.tool_call
             assert call is not None
+            if action.assistant_message is not None:
+                self.history.append(action.assistant_message)
+                self.record(action.assistant_message)
             yield Event("tool_call_started", asdict(call))
             result = self.tools.run(call, context)
             yield Event("tool_call_finished", asdict(result))
-            self.history.append(Message("tool", result.output))
-            self.record("tool", result.output)
+            tool_message = Message("tool", result.output, tool_call_id=call.id, name=call.name)
+            self.history.append(tool_message)
+            self.record(tool_message)
 
 
 class ThreadManager:
-    def __init__(self, codex_home: Path) -> None:
+    def __init__(self, codex_home: Path, model_args: argparse.Namespace | None = None) -> None:
         self.codex_home = codex_home
+        self.model_args = model_args
         self.store = RolloutStore(codex_home)
         self.extensions = ExtensionManager(codex_home)
         self.configs: dict[str, Config] = {}
@@ -486,7 +544,7 @@ class ThreadManager:
                 raise KeyError(f"unknown thread: {thread_id}")
             config = Config(cwd=Path(records[0].get("cwd", ".")).resolve(), codex_home=self.codex_home)
             self.configs[thread_id] = config
-        return Agent(thread_id, config, self.extensions, self.store)
+        return Agent(thread_id, config, self.extensions, self.store, model_args=self.model_args)
 
 
 class MiniAppServer:
@@ -546,7 +604,7 @@ def render_events(events: Iterable[Event], jsonl: bool) -> None:
 
 
 def server_main(args: argparse.Namespace) -> None:
-    server = MiniAppServer(ThreadManager(Path(args.codex_home).expanduser()))
+    server = MiniAppServer(ThreadManager(Path(args.codex_home).expanduser(), args))
     for line in sys.stdin:
         if not line.strip():
             continue
@@ -555,13 +613,13 @@ def server_main(args: argparse.Namespace) -> None:
 
 
 def exec_main(args: argparse.Namespace) -> None:
-    manager = ThreadManager(Path(args.codex_home).expanduser())
+    manager = ThreadManager(Path(args.codex_home).expanduser(), args)
     thread_id = args.resume or manager.start_thread(args.cwd, args.approval, args.sandbox)
     render_events(manager.get_agent(thread_id).turn_events(args.prompt), args.jsonl)
 
 
 def chat_main(args: argparse.Namespace) -> None:
-    manager = ThreadManager(Path(args.codex_home).expanduser())
+    manager = ThreadManager(Path(args.codex_home).expanduser(), args)
     thread_id = args.resume or manager.start_thread(args.cwd, args.approval, args.sandbox)
     print(f"mini-codex full chat thread={thread_id}. Type /quit.")
     while True:
@@ -605,6 +663,7 @@ def add_runtime_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--sandbox", choices=["read-only", "workspace-write", "danger-full-access"], default="workspace-write")
     parser.add_argument("--resume")
     parser.add_argument("--jsonl", action="store_true")
+    add_model_args(parser)
 
 
 def main() -> None:
@@ -620,6 +679,7 @@ def main() -> None:
 
     server_parser = sub.add_parser("server")
     server_parser.add_argument("--codex-home", default=".mini-codex")
+    add_model_args(server_parser)
 
     threads_parser = sub.add_parser("threads")
     threads_parser.add_argument("--codex-home", default=".mini-codex")

@@ -34,16 +34,35 @@ sequenceDiagram
 
 ## 运行
 
+本步骤从一开始就调用真实模型。它使用 OpenAI 兼容的 `POST /v1/chat/completions` 协议，不依赖第三方 Python 包，只需要配置环境变量：
+
 ```bash
+export OPENAI_API_KEY="你的 API key"
+export OPENAI_MODEL="你的模型名"
+export OPENAI_BASE_URL="https://api.openai.com/v1"  # 使用兼容服务时改成对应 base URL
+
 python3 mini_codex.py --once "hello codex"
 python3 mini_codex.py
 ```
 
 REPL 中输入 `/history` 可以查看历史，输入 `/quit` 退出。
 
+可选环境变量：
+
+- `OPENAI_SYSTEM_PROMPT`：覆盖默认 system prompt。
+- `OPENAI_TEMPERATURE`：设置采样温度；不设置则不传该字段。
+- `OPENAI_MAX_TOKENS`：设置最大输出 token；不设置则不传该字段。
+- `OPENAI_TIMEOUT`：HTTP 超时时间，单位秒，默认 `60`。
+
+也可以用命令行参数覆盖部分配置：
+
+```bash
+python3 mini_codex.py --model "你的模型名" --base-url "https://api.openai.com/v1"
+```
+
 ## 实现逻辑
 
-`RuleBasedModel` 是一个本地规则模型。它不调用网络，只根据最后一条用户消息生成回答。这样第一步可以专注 runtime 结构，而不是 API 细节。
+`OpenAIChatModel` 是一个最小模型适配器。它把 `history` 转成 OpenAI 兼容的 `messages`，发送到 `/chat/completions`，再从 `choices[0].message.content` 取出 assistant 文本。这里先不做工具调用、流式输出、重试和复杂错误恢复，只保留真实对话最需要的模型请求链路。
 
 `Agent.turn()` 是本章最重要的函数：
 

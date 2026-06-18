@@ -1,6 +1,6 @@
 # Step 5: Approvals And Sandbox
 
-本章给 shell 和 patch 加上审批与沙箱。真实 Codex 的安全边界比教学版复杂得多，但核心问题一样：模型想执行动作，不代表 runtime 应该无条件执行。
+本章在 Step 4 的真实工具调用和文件编辑基础上，给 shell 和 patch 加上审批与沙箱。真实 Codex 的安全边界比教学版复杂得多，但核心问题一样：模型想执行动作，不代表 runtime 应该无条件执行。
 
 ## 本步目标
 
@@ -40,6 +40,10 @@ Codex 的模型输出是不可信的本地意图。审批和沙箱把“模型�
 ## 运行
 
 ```bash
+export OPENAI_API_KEY="你的 API key"
+export OPENAI_MODEL="你的模型名"
+export OPENAI_BASE_URL="https://api.openai.com/v1"
+
 python3 mini_codex.py --approval never --sandbox workspace-write --once "run echo safe"
 python3 mini_codex.py --approval never --sandbox read-only --once "write blocked.txt no"
 ```
@@ -48,7 +52,7 @@ python3 mini_codex.py --approval never --sandbox read-only --once "write blocked
 
 ## 实现逻辑
 
-`PermissionPolicy.check()` 返回三种结果：
+模型仍然只返回 OpenAI `tool_calls`。`PermissionPolicy.check()` 在本地 runtime 里返回三种结果：
 
 - `allow`：直接执行。
 - `ask`：根据 approval policy 询问用户。

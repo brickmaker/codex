@@ -1,38 +1,26 @@
 #!/usr/bin/env python3
-"""Step 1: a tiny agent loop with history."""
-
-from __future__ import annotations
+"""Step 1: a tiny agent loop backed by an OpenAI-compatible LLM."""
 
 import argparse
-from dataclasses import dataclass
+import sys
+from pathlib import Path
 
-
-@dataclass
-class Message:
-    role: str
-    content: str
-
-
-class RuleBasedModel:
-    """A deterministic stand-in for an LLM."""
-
-    def generate(self, history: list[Message]) -> str:
-        last = history[-1].content.strip()
-        if not last:
-            return "I need a prompt before I can help."
-        if "history" in last.lower():
-            return f"I can see {len(history)} message(s) in this thread."
-        return f"You said: {last}"
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from mini_llm import Message, OpenAIChatModel, add_model_args, build_model
 
 
 class Agent:
-    def __init__(self, model: RuleBasedModel) -> None:
+    def __init__(self, model: OpenAIChatModel) -> None:
         self.model = model
         self.history: list[Message] = []
 
     def turn(self, user_text: str) -> str:
         self.history.append(Message("user", user_text))
-        answer = self.model.generate(self.history)
+        try:
+            answer = self.model.complete(self.history)
+        except Exception:
+            self.history.pop()
+            raise
         self.history.append(Message("assistant", answer))
         return answer
 
@@ -61,9 +49,10 @@ def repl(agent: Agent) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--once", help="Run one turn and exit.")
+    add_model_args(parser)
     args = parser.parse_args()
 
-    agent = Agent(RuleBasedModel())
+    agent = Agent(build_model(args))
     if args.once is not None:
         print(agent.turn(args.once))
     else:

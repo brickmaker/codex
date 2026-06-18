@@ -6,11 +6,21 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import sys
 import time
 import uuid
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterable, Literal
+from typing import Iterable
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from mini_llm import Message, ToolCall, add_model_args, build_model, function_tool
+
+
+SYSTEM_PROMPT = (
+    "You are Mini Codex behind a tiny app-server protocol. Use tools when local work is needed, "
+    "then return a concise final answer."
+)
 
 
 @dataclass
@@ -21,21 +31,9 @@ class Config:
 
 
 @dataclass
-class Message:
-    role: str
-    content: str
-
-
-@dataclass
 class Event:
     type: str
     data: dict
-
-
-@dataclass
-class ToolCall:
-    name: str
-    arguments: dict
 
 
 @dataclass
@@ -43,13 +41,6 @@ class ToolResult:
     name: str
     ok: bool
     output: str
-
-
-@dataclass
-class ModelAction:
-    kind: Literal["final", "tool_call"]
-    text: str = ""
-    tool_call: ToolCall | None = None
 
 
 def ensure_inside(root: Path, user_path: str) -> Path:
@@ -108,7 +99,15 @@ class RolloutStore:
         messages: list[Message] = []
         for record in self.records(thread_id):
             if record.get("type") in {"user_message", "assistant_message", "tool_message"}:
-                messages.append(Message(record["role"], record["content"]))
+                messages.append(
+                    Message(
+                        record["role"],
+                        record.get("content", ""),
+                        tool_call_id=record.get("tool_call_id"),
+                        name=record.get("name"),
+                        tool_calls=record.get("tool_calls"),
+                    )
+                )
         return messages
 
     def list_threads(self) -> list[dict]:
@@ -123,6 +122,27 @@ class ToolRegistry:
     def __init__(self, config: Config) -> None:
         self.config = config
 
+    def tool_specs(self) -> list[dict]:
+        return [
+            function_tool(
+                "shell",
+                "Run a shell command in the thread workspace.",
+                {"command": {"type": "string", "description": "Command to execute."}},
+                ["command"],
+            ),
+            function_tool(
+                "apply_patch",
+                "Apply a simple Add File patch inside the workspace.",
+                {
+                    "patch": {
+                        "type": "string",
+                        "description": "Patch text enclosed by *** Begin Patch and *** End Patch.",
+                    }
+                },
+                ["patch"],
+            ),
+        ]
+
     def run(self, call: ToolCall) -> ToolResult:
         if call.name == "shell":
             command = str(call.arguments.get("command", ""))
@@ -135,65 +155,57 @@ class ToolRegistry:
         return ToolResult(call.name, False, f"unknown tool: {call.name}")
 
 
-class RuleBasedModel:
-    def next_action(self, history: list[Message]) -> ModelAction:
-        last = history[-1]
-        if last.role == "tool":
-            return ModelAction("final", text=f"Tool finished:\n{last.content or '(no output)'}")
-        text = last.content.strip()
-        lowered = text.lower()
-        if "history" in lowered:
-            return ModelAction("final", text=f"Thread has {len(history)} message(s).")
-        if lowered == "pwd":
-            return ModelAction("tool_call", tool_call=ToolCall("shell", {"command": "pwd"}))
-        if lowered.startswith("run "):
-            return ModelAction("tool_call", tool_call=ToolCall("shell", {"command": text[4:]}))
-        if lowered.startswith("write "):
-            parts = text.split(maxsplit=2)
-            if len(parts) < 3:
-                return ModelAction("final", text="Usage: write <path> <content>")
-            _, path, content = parts
-            return ModelAction("tool_call", tool_call=ToolCall("apply_patch", {"patch": simple_patch(path, content)}))
-        return ModelAction("final", text=f"You said: {text}")
-
-
 class Agent:
-    def __init__(self, thread_id: str, config: Config, store: RolloutStore) -> None:
+    def __init__(self, thread_id: str, config: Config, store: RolloutStore, model_args: argparse.Namespace | None = None) -> None:
         self.thread_id = thread_id
         self.config = config
         self.store = store
         self.history = store.history(thread_id)
-        self.model = RuleBasedModel()
+        self.model = build_model(model_args, SYSTEM_PROMPT)
         self.tools = ToolRegistry(config)
 
-    def record(self, role: str, content: str) -> None:
-        self.store.append(self.thread_id, {"type": f"{role}_message", "role": role, "content": content, "ts": time.time()})
+    def record(self, message: Message) -> None:
+        record = {"type": f"{message.role}_message", "role": message.role, "content": message.content, "ts": time.time()}
+        if message.tool_call_id:
+            record["tool_call_id"] = message.tool_call_id
+        if message.name:
+            record["name"] = message.name
+        if message.tool_calls:
+            record["tool_calls"] = message.tool_calls
+        self.store.append(self.thread_id, record)
 
     def turn_events(self, user_text: str) -> Iterable[Event]:
-        self.history.append(Message("user", user_text))
-        self.record("user", user_text)
+        user_message = Message("user", user_text)
+        self.history.append(user_message)
+        self.record(user_message)
         yield Event("turn_started", {"threadId": self.thread_id, "input": user_text})
         while True:
-            action = self.model.next_action(self.history)
+            action = self.model.next_action(self.history, self.tools.tool_specs())
             if action.kind == "final":
-                self.history.append(Message("assistant", action.text))
-                self.record("assistant", action.text)
+                assistant_message = Message("assistant", action.text)
+                self.history.append(assistant_message)
+                self.record(assistant_message)
                 for word in action.text.split(" "):
                     yield Event("assistant_delta", {"threadId": self.thread_id, "delta": word + " "})
                 yield Event("turn_completed", {"threadId": self.thread_id, "answer": action.text})
                 return
             call = action.tool_call
             assert call is not None
+            if action.assistant_message is not None:
+                self.history.append(action.assistant_message)
+                self.record(action.assistant_message)
             yield Event("tool_call_started", {"threadId": self.thread_id, **asdict(call)})
             result = self.tools.run(call)
             yield Event("tool_call_finished", {"threadId": self.thread_id, **asdict(result)})
-            self.history.append(Message("tool", result.output))
-            self.record("tool", result.output)
+            tool_message = Message("tool", result.output, tool_call_id=call.id, name=call.name)
+            self.history.append(tool_message)
+            self.record(tool_message)
 
 
 class ThreadManager:
-    def __init__(self, codex_home: Path) -> None:
+    def __init__(self, codex_home: Path, model_args: argparse.Namespace | None = None) -> None:
         self.codex_home = codex_home
+        self.model_args = model_args
         self.store = RolloutStore(codex_home)
         self.configs: dict[str, Config] = {}
         self.last_thread_id: str | None = None
@@ -218,7 +230,7 @@ class ThreadManager:
                 raise KeyError(f"unknown thread: {thread_id}")
             config = Config(cwd=Path(records[0].get("cwd", ".")).resolve(), codex_home=self.codex_home)
             self.configs[thread_id] = config
-        return Agent(thread_id, config, self.store)
+        return Agent(thread_id, config, self.store, self.model_args)
 
 
 class MiniAppServer:
@@ -273,17 +285,17 @@ def render_event(event: Event, jsonl: bool) -> None:
         print()
 
 
-def server_main(codex_home: Path) -> None:
-    server = MiniAppServer(ThreadManager(codex_home))
-    for line in __import__("sys").stdin:
+def server_main(codex_home: Path, model_args: argparse.Namespace | None = None) -> None:
+    server = MiniAppServer(ThreadManager(codex_home, model_args))
+    for line in sys.stdin:
         if not line.strip():
             continue
         for output in server.handle(json.loads(line)):
             print(json.dumps(output, ensure_ascii=False), flush=True)
 
 
-def chat_once(prompt: str, cwd: str, codex_home: Path, jsonl: bool) -> None:
-    manager = ThreadManager(codex_home)
+def chat_once(prompt: str, cwd: str, codex_home: Path, jsonl: bool, model_args: argparse.Namespace | None = None) -> None:
+    manager = ThreadManager(codex_home, model_args)
     thread_id = manager.start_thread(cwd)
     agent = manager.get_agent(thread_id)
     for event in agent.turn_events(prompt):
@@ -297,13 +309,14 @@ def main() -> None:
     parser.add_argument("--cwd", default=".")
     parser.add_argument("--codex-home", default=".mini-codex")
     parser.add_argument("--jsonl", action="store_true")
+    add_model_args(parser)
     args = parser.parse_args()
 
     codex_home = Path(args.codex_home).expanduser()
     if args.mode == "server":
-        server_main(codex_home)
+        server_main(codex_home, args)
     elif args.once is not None:
-        chat_once(args.once, args.cwd, codex_home, args.jsonl)
+        chat_once(args.once, args.cwd, codex_home, args.jsonl, args)
     else:
         raise SystemExit("step8 supports --once chat or server mode")
 

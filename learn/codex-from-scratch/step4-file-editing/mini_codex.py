@@ -6,15 +6,19 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterable, Literal
+from typing import Iterable
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from mini_llm import Message, OpenAIChatModel, ToolCall, add_model_args, build_model, function_tool
 
 
-@dataclass
-class Message:
-    role: str
-    content: str
+SYSTEM_PROMPT = (
+    "You are Mini Codex. Use shell to inspect files and apply_patch to edit files. "
+    "When editing files, call apply_patch with a Codex-style patch string."
+)
 
 
 @dataclass
@@ -24,23 +28,10 @@ class Event:
 
 
 @dataclass
-class ToolCall:
-    name: str
-    arguments: dict
-
-
-@dataclass
 class ToolResult:
     name: str
     ok: bool
     output: str
-
-
-@dataclass
-class ModelAction:
-    kind: Literal["final", "tool_call"]
-    text: str = ""
-    tool_call: ToolCall | None = None
 
 
 def ensure_inside(root: Path, user_path: str) -> Path:
@@ -142,6 +133,27 @@ class ToolRegistry:
             ApplyPatchTool.name: ApplyPatchTool(cwd),
         }
 
+    def tool_specs(self) -> list[dict]:
+        return [
+            function_tool(
+                "shell",
+                "Run a shell command in the workspace.",
+                {"command": {"type": "string", "description": "Command to execute."}},
+                ["command"],
+            ),
+            function_tool(
+                "apply_patch",
+                "Apply a Codex-style patch inside the workspace.",
+                {
+                    "patch": {
+                        "type": "string",
+                        "description": "Patch text enclosed by *** Begin Patch and *** End Patch.",
+                    }
+                },
+                ["patch"],
+            ),
+        ]
+
     def run(self, call: ToolCall) -> ToolResult:
         tool = self.tools.get(call.name)
         if tool is None:
@@ -149,40 +161,8 @@ class ToolRegistry:
         return tool.run(call.arguments)
 
 
-class RuleBasedModel:
-    def next_action(self, history: list[Message]) -> ModelAction:
-        last = history[-1]
-        if last.role == "tool":
-            return ModelAction("final", text=f"Tool finished:\n{last.content or '(no output)'}")
-
-        text = last.content.strip()
-        lowered = text.lower()
-        if lowered == "pwd":
-            return ModelAction("tool_call", tool_call=ToolCall("shell", {"command": "pwd"}))
-        if lowered.startswith("run "):
-            return ModelAction("tool_call", tool_call=ToolCall("shell", {"command": text[4:]}))
-        if lowered.startswith("show "):
-            filename = text.split(maxsplit=1)[1]
-            return ModelAction("tool_call", tool_call=ToolCall("shell", {"command": f"cat {filename}"}))
-        if lowered.startswith("write "):
-            parts = text.split(maxsplit=2)
-            if len(parts) < 3:
-                return ModelAction("final", text="Usage: write <path> <content>")
-            _, path, content = parts
-            patch = "\n".join(
-                [
-                    "*** Begin Patch",
-                    f"*** Add File: {path}",
-                    f"+{content}",
-                    "*** End Patch",
-                ]
-            )
-            return ModelAction("tool_call", tool_call=ToolCall("apply_patch", {"patch": patch}))
-        return ModelAction("final", text=f"You said: {text}")
-
-
 class Agent:
-    def __init__(self, model: RuleBasedModel, tools: ToolRegistry) -> None:
+    def __init__(self, model: OpenAIChatModel, tools: ToolRegistry) -> None:
         self.model = model
         self.tools = tools
         self.history: list[Message] = []
@@ -191,7 +171,7 @@ class Agent:
         self.history.append(Message("user", user_text))
         yield Event("turn_started", {"input": user_text})
         while True:
-            action = self.model.next_action(self.history)
+            action = self.model.next_action(self.history, self.tools.tool_specs())
             if action.kind == "final":
                 self.history.append(Message("assistant", action.text))
                 for word in action.text.split(" "):
@@ -201,10 +181,12 @@ class Agent:
 
             call = action.tool_call
             assert call is not None
+            if action.assistant_message is not None:
+                self.history.append(action.assistant_message)
             yield Event("tool_call_started", asdict(call))
             result = self.tools.run(call)
             yield Event("tool_call_finished", asdict(result))
-            self.history.append(Message("tool", result.output))
+            self.history.append(Message("tool", result.output, tool_call_id=call.id, name=call.name))
 
 
 def render_event(event: Event, jsonl: bool) -> None:
@@ -244,11 +226,12 @@ def main() -> None:
     parser.add_argument("--once", help="Run one turn and exit.")
     parser.add_argument("--jsonl", action="store_true", help="Render events as JSON lines.")
     parser.add_argument("--cwd", default=".", help="Workspace directory.")
+    add_model_args(parser)
     args = parser.parse_args()
 
     cwd = Path(args.cwd).resolve()
     cwd.mkdir(parents=True, exist_ok=True)
-    agent = Agent(RuleBasedModel(), ToolRegistry(cwd))
+    agent = Agent(build_model(args, SYSTEM_PROMPT), ToolRegistry(cwd))
     if args.once is not None:
         run_turn(agent, args.once, args.jsonl)
     else:

@@ -64,7 +64,7 @@ flowchart TD
 | CLI 分发 | `chat`、`exec`、`server`、`review` 子命令 | `codex-rs/cli/src/main.rs` |
 | app-server 协议 | JSON Lines RPC | `codex-rs/app-server/src/message_processor.rs` |
 | thread/session/turn | `ThreadManager`、`Agent`、`run_turn` | `codex-rs/core/src/thread_manager.rs`、`session/*` |
-| 模型流 | `RuleBasedModel` 事件/工具动作 | `codex-rs/core/src/client.rs`、`session/turn.rs` |
+| 模型流 | `OpenAIChatModel` + OpenAI-compatible `tool_calls` | `codex-rs/core/src/client.rs`、`session/turn.rs` |
 | context | AGENTS.md、env、history cap、skills catalog | `codex-rs/core/src/context/*` |
 | shell/patch | `shell`、`apply_patch` 工具 | `codex-rs/core/src/tools/handlers/*` |
 | approvals/sandbox | policy check + workspace path guard | `codex-rs/protocol/src/approvals.rs`、`core/src/sandboxing` |
@@ -76,6 +76,10 @@ flowchart TD
 ## 运行
 
 ```bash
+export OPENAI_API_KEY="你的 API key"
+export OPENAI_MODEL="你的模型名"
+export OPENAI_BASE_URL="https://api.openai.com/v1"
+
 python3 mini_codex.py init-sample-extension --codex-home /tmp/mini-codex-full
 python3 mini_codex.py exec --codex-home /tmp/mini-codex-full "plan build a feature"
 python3 mini_codex.py exec --codex-home /tmp/mini-codex-full "reverse abc"
@@ -86,6 +90,10 @@ python3 mini_codex.py threads --codex-home /tmp/mini-codex-full
 server 模式：
 
 ```bash
+export OPENAI_API_KEY="你的 API key"
+export OPENAI_MODEL="你的模型名"
+export OPENAI_BASE_URL="https://api.openai.com/v1"
+
 printf '{"id":1,"method":"thread/start","params":{"cwd":"."}}\n{"id":2,"method":"turn/start","params":{"threadId":"LAST","input":"run echo hi"}}\n' | python3 mini_codex.py server
 ```
 
@@ -97,13 +105,13 @@ printf '{"id":1,"method":"thread/start","params":{"cwd":"."}}\n{"id":2,"method":
 2. 配置与权限：`Config`、`PermissionPolicy`。
 3. 上下文：`ContextManager`。
 4. 工具：`ToolRegistry` 和一组 handler。
-5. 模型：`RuleBasedModel`。
+5. 模型：`OpenAIChatModel`，使用 OpenAI-compatible Chat Completions 和 `tools/tool_calls`。
 6. 会话：`Agent.run_turn()`。
 7. 持久化：`RolloutStore`。
 8. 入口：`chat`、`exec`、`server`、`review`、管理命令。
 
-教学版没有实现真实网络模型、跨平台强 sandbox、TUI ratatui 渲染、schema 生成、远程环境和云端认证；但每个位置都留下了清楚的替换点。
+教学版没有实现跨平台强 sandbox、TUI ratatui 渲染、schema 生成、远程环境和云端认证；但每个位置都留下了清楚的替换点。
 
 ## 继续扩展
 
-你可以把 `RuleBasedModel` 换成真实 Responses API adapter，把 `PluginTool` 换成 MCP stdio client，把 `chat` 换成 curses/文本 UI。到这一步，架构已经和 Codex 的主干同构：前端只提交 turn，runtime 统一管理上下文、工具、权限和历史。
+你可以把 `OpenAIChatModel` 换成真实 Responses API adapter，把 `PluginTool` 换成 MCP stdio client，把 `chat` 换成 curses/文本 UI。到这一步，架构已经和 Codex 的主干同构：前端只提交 turn，runtime 统一管理上下文、工具、权限和历史。

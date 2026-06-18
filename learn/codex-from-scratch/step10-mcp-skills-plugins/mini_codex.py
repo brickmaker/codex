@@ -6,9 +6,19 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterable, Literal
+from typing import Iterable
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from mini_llm import Message, OpenAIChatModel, ToolCall, add_model_args, build_model, function_tool
+
+
+SYSTEM_PROMPT = (
+    "You are Mini Codex with skills and MCP-like plugin tools. Use the runtime context to see available skills "
+    "and tools. Call tools when they are useful; otherwise answer directly."
+)
 
 
 @dataclass
@@ -18,21 +28,9 @@ class Config:
 
 
 @dataclass
-class Message:
-    role: str
-    content: str
-
-
-@dataclass
 class Event:
     type: str
     data: dict
-
-
-@dataclass
-class ToolCall:
-    name: str
-    arguments: dict
 
 
 @dataclass
@@ -40,13 +38,6 @@ class ToolResult:
     name: str
     ok: bool
     output: str
-
-
-@dataclass
-class ModelAction:
-    kind: Literal["final", "tool_call"]
-    text: str = ""
-    tool_call: ToolCall | None = None
 
 
 class ExtensionManager:
@@ -134,6 +125,45 @@ class ToolRegistry:
         ]
         return builtins + self.extensions.plugin_tools()
 
+    def tool_specs(self) -> list[dict]:
+        specs = [
+            function_tool(
+                "shell",
+                "Run a shell command in the workspace.",
+                {"command": {"type": "string", "description": "Command to execute."}},
+                ["command"],
+            ),
+            function_tool(
+                "apply_patch",
+                "Write a file inside the workspace.",
+                {
+                    "path": {"type": "string", "description": "Workspace-relative path."},
+                    "content": {"type": "string", "description": "Complete file content to write."},
+                },
+                ["path", "content"],
+            ),
+        ]
+        for tool in self.extensions.plugin_tools():
+            if tool["name"] == "reverse":
+                specs.append(
+                    function_tool(
+                        "reverse",
+                        tool.get("description", "Reverse text."),
+                        {"text": {"type": "string", "description": "Text to reverse."}},
+                        ["text"],
+                    )
+                )
+            elif tool["name"] == "word_count":
+                specs.append(
+                    function_tool(
+                        "word_count",
+                        tool.get("description", "Count words."),
+                        {"text": {"type": "string", "description": "Text to count."}},
+                        ["text"],
+                    )
+                )
+        return specs
+
     def run(self, call: ToolCall) -> ToolResult:
         if call.name == "shell":
             command = str(call.arguments.get("command", ""))
@@ -157,31 +187,8 @@ class ToolRegistry:
         return ToolResult(call.name, False, f"unknown tool: {call.name}")
 
 
-class RuleBasedModel:
-    def next_action(self, context: str, history: list[Message]) -> ModelAction:
-        last = history[-1]
-        if last.role == "tool":
-            return ModelAction("final", text=f"Tool finished:\n{last.content or '(no output)'}")
-        text = last.content.strip()
-        lowered = text.lower()
-        if "skills" in lowered:
-            return ModelAction("final", text="Visible context:\n" + context)
-        if lowered.startswith("reverse "):
-            return ModelAction("tool_call", tool_call=ToolCall("reverse", {"text": text.split(maxsplit=1)[1]}))
-        if lowered.startswith("count words "):
-            return ModelAction("tool_call", tool_call=ToolCall("word_count", {"text": text.removeprefix("count words ")}))
-        if lowered.startswith("run "):
-            return ModelAction("tool_call", tool_call=ToolCall("shell", {"command": text[4:]}))
-        if lowered.startswith("write "):
-            parts = text.split(maxsplit=2)
-            if len(parts) < 3:
-                return ModelAction("final", text="Usage: write <path> <content>")
-            return ModelAction("tool_call", tool_call=ToolCall("apply_patch", {"path": parts[1], "content": parts[2] + "\n"}))
-        return ModelAction("final", text=f"You said: {text}")
-
-
 class Agent:
-    def __init__(self, model: RuleBasedModel, tools: ToolRegistry, context: ContextManager) -> None:
+    def __init__(self, model: OpenAIChatModel, tools: ToolRegistry, context: ContextManager) -> None:
         self.model = model
         self.tools = tools
         self.context_manager = context
@@ -191,7 +198,11 @@ class Agent:
         self.history.append(Message("user", prompt))
         yield Event("turn_started", {"input": prompt})
         while True:
-            action = self.model.next_action(self.context_manager.build(self.history), self.history)
+            action = self.model.next_action(
+                self.history,
+                self.tools.tool_specs(),
+                context=self.context_manager.build(self.history),
+            )
             if action.kind == "final":
                 self.history.append(Message("assistant", action.text))
                 yield Event("assistant_message", {"text": action.text})
@@ -199,10 +210,12 @@ class Agent:
                 return
             call = action.tool_call
             assert call is not None
+            if action.assistant_message is not None:
+                self.history.append(action.assistant_message)
             yield Event("tool_call_started", asdict(call))
             result = self.tools.run(call)
             yield Event("tool_call_finished", asdict(result))
-            self.history.append(Message("tool", result.output))
+            self.history.append(Message("tool", result.output, tool_call_id=call.id, name=call.name))
 
 
 def render(events: Iterable[Event], jsonl: bool) -> None:
@@ -223,7 +236,7 @@ def build_agent(args: argparse.Namespace) -> Agent:
     cwd.mkdir(parents=True, exist_ok=True)
     config = Config(cwd=cwd, codex_home=home)
     extensions = ExtensionManager(home)
-    return Agent(RuleBasedModel(), ToolRegistry(config, extensions), ContextManager(config, extensions))
+    return Agent(build_model(args, SYSTEM_PROMPT), ToolRegistry(config, extensions), ContextManager(config, extensions))
 
 
 def main() -> None:
@@ -247,6 +260,7 @@ def main() -> None:
     exec_parser.add_argument("--codex-home", default=".mini-codex")
     exec_parser.add_argument("--cwd", default=".")
     exec_parser.add_argument("--jsonl", action="store_true")
+    add_model_args(exec_parser)
 
     args = parser.parse_args()
     extensions = ExtensionManager(Path(args.codex_home).expanduser())
