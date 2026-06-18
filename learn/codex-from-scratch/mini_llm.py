@@ -41,6 +41,13 @@ class ModelAction:
 
 
 @dataclass
+class ModelStreamEvent:
+    kind: Literal["delta", "action"]
+    delta: str = ""
+    action: ModelAction | None = None
+
+
+@dataclass
 class ModelConfig:
     api_key: str
     model: str
@@ -73,6 +80,80 @@ class OpenAIChatModel:
                 content = delta.get("content")
                 if isinstance(content, str):
                     yield content
+
+    def stream_action(
+        self,
+        history: list[Message],
+        tools: list[dict[str, Any]],
+        context: str = "",
+    ) -> Iterable[ModelStreamEvent]:
+        payload = self._payload(history, context)
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
+        payload["stream"] = True
+
+        content_parts: list[str] = []
+        streamed_tool_calls: dict[int, dict[str, Any]] = {}
+        for event in self._post_stream(payload):
+            choices = event.get("choices")
+            if not isinstance(choices, list) or not choices:
+                continue
+            delta = choices[0].get("delta", {})
+            if not isinstance(delta, dict):
+                continue
+
+            content = delta.get("content")
+            if isinstance(content, str):
+                content_parts.append(content)
+                yield ModelStreamEvent("delta", delta=content)
+
+            raw_tool_calls = delta.get("tool_calls")
+            if not isinstance(raw_tool_calls, list):
+                continue
+            for raw_tool_call in raw_tool_calls:
+                if not isinstance(raw_tool_call, dict):
+                    continue
+                index = raw_tool_call.get("index")
+                if not isinstance(index, int):
+                    raise RuntimeError(f"streamed tool call did not include an index: {raw_tool_call}")
+                tool_call = streamed_tool_calls.setdefault(
+                    index,
+                    {"id": "", "type": "function", "function": {"name": "", "arguments": ""}},
+                )
+                raw_id = raw_tool_call.get("id")
+                if isinstance(raw_id, str):
+                    tool_call["id"] = raw_id
+                raw_type = raw_tool_call.get("type")
+                if isinstance(raw_type, str):
+                    tool_call["type"] = raw_type
+                raw_function = raw_tool_call.get("function")
+                if isinstance(raw_function, dict):
+                    function = tool_call["function"]
+                    name = raw_function.get("name")
+                    if isinstance(name, str):
+                        function["name"] += name
+                    arguments = raw_function.get("arguments")
+                    if isinstance(arguments, str):
+                        function["arguments"] += arguments
+
+        text = "".join(content_parts).rstrip()
+        raw_tool_calls = []
+        for index, tool_call in sorted(streamed_tool_calls.items()):
+            raw_tool_calls.append(
+                {
+                    "id": tool_call["id"] or f"call_{index}",
+                    "type": tool_call["type"],
+                    "function": tool_call["function"],
+                }
+            )
+        if raw_tool_calls:
+            tool_call = parse_tool_call(raw_tool_calls[0])
+            assistant_message = Message("assistant", text, tool_calls=raw_tool_calls)
+            action = ModelAction("tool_call", text=text, tool_call=tool_call, assistant_message=assistant_message)
+        else:
+            action = ModelAction("final", text=text)
+        yield ModelStreamEvent("action", action=action)
 
     def next_action(self, history: list[Message], tools: list[dict[str, Any]], context: str = "") -> ModelAction:
         payload = self._payload(history, context)

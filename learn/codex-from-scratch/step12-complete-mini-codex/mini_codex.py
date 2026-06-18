@@ -18,8 +18,8 @@ from mini_llm import Message, OpenAIChatModel, ToolCall, add_model_args, build_m
 
 
 SYSTEM_PROMPT = (
-    "You are Mini Codex, a teaching-sized local coding agent. Use runtime context, tools, plans, skills, "
-    "and child agents when useful. Return concise final answers after tool work."
+    "You are Mini Codex, a teaching-sized local coding agent. Use runtime context and available capabilities "
+    "when useful. Return concise final answers after local work."
 )
 
 
@@ -202,8 +202,7 @@ class ContextManager:
             f"sandbox: {self.config.sandbox}",
             f"approval: {self.config.approval}",
             f"auth: {self.extensions.auth_status()}",
-            "built-in tools: shell, apply_patch, update_plan, tool_search, spawn_agent, compact_context, "
-            "get_context_remaining, web_search, view_image, generate_image, browser_open, request_user_input",
+            "Use the attached tool schemas for currently available tools.",
             "skills:\n" + skills,
             "plugin tools:\n" + plugin_tools,
             "plan:\n" + plan_text,
@@ -494,12 +493,20 @@ class Agent:
         yield Event("turn_started", {"threadId": self.thread_id, "role": self.role, "input": prompt})
         while True:
             context = self.context()
-            action = self.model.next_action(self.history, self.tools.tool_specs(), context=context)
+            action = None
+            for model_event in self.model.stream_action(self.history, self.tools.tool_specs(), context=context):
+                if model_event.kind == "delta":
+                    yield Event("assistant_delta", {"delta": model_event.delta})
+                elif model_event.action is not None:
+                    action = model_event.action
+
+            if action is None:
+                raise RuntimeError("model stream ended without an action")
+
             if action.kind == "final":
                 assistant_message = Message("assistant", action.text)
                 self.history.append(assistant_message)
                 self.record(assistant_message)
-                yield Event("assistant_message", {"text": action.text})
                 yield Event("turn_completed", {"threadId": self.thread_id, "answer": action.text})
                 return
             call = action.tool_call
@@ -595,12 +602,14 @@ def render_events(events: Iterable[Event], jsonl: bool) -> None:
     for event in events:
         if jsonl:
             print(json.dumps(asdict(event), ensure_ascii=False))
-        elif event.type == "assistant_message":
-            print(event.data["text"])
+        elif event.type == "assistant_delta":
+            print(event.data["delta"], end="", flush=True)
         elif event.type == "tool_call_started":
             print(f"[tool] {event.data['name']} {event.data['arguments']}")
         elif event.type == "tool_call_finished":
             print(event.data["output"])
+        elif event.type == "turn_completed":
+            print()
 
 
 def server_main(args: argparse.Namespace) -> None:

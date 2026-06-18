@@ -16,8 +16,8 @@ from mini_llm import Message, OpenAIChatModel, ToolCall, add_model_args, build_m
 
 
 SYSTEM_PROMPT = (
-    "You are Mini Codex. Use shell to inspect files and apply_patch to edit files. "
-    "When editing files, call apply_patch with a Codex-style patch string."
+    "You are Mini Codex, a local coding agent. Answer directly when no local action is needed. "
+    "Use the available tool schemas to decide whether to inspect or change the workspace."
 )
 
 
@@ -171,11 +171,18 @@ class Agent:
         self.history.append(Message("user", user_text))
         yield Event("turn_started", {"input": user_text})
         while True:
-            action = self.model.next_action(self.history, self.tools.tool_specs())
+            action = None
+            for model_event in self.model.stream_action(self.history, self.tools.tool_specs()):
+                if model_event.kind == "delta":
+                    yield Event("assistant_delta", {"delta": model_event.delta})
+                elif model_event.action is not None:
+                    action = model_event.action
+
+            if action is None:
+                raise RuntimeError("model stream ended without an action")
+
             if action.kind == "final":
                 self.history.append(Message("assistant", action.text))
-                for word in action.text.split(" "):
-                    yield Event("assistant_delta", {"delta": word + " "})
                 yield Event("turn_completed", {"answer": action.text})
                 return
 

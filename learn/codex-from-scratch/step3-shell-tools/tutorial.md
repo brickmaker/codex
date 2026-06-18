@@ -48,7 +48,7 @@ python3 mini_codex.py --jsonl --once "pwd"
 
 ## 实现逻辑
 
-`OpenAIChatModel.next_action()` 会把 `history` 和 `shell` 工具 schema 一起发给模型。模型要行动时，会返回 OpenAI 兼容的 `tool_calls`；runtime 解析为 `ToolCall(name="shell")` 并执行。`Agent.turn_events()` 持续循环：
+`OpenAIChatModel.stream_action()` 会把 `history` 和工具 schema 一起发给模型，并用 streaming response 同时接收文本增量和 OpenAI 兼容的 `tool_calls`。模型要行动时，runtime 解析为 `ToolCall(name="shell")` 并执行。`Agent.turn_events()` 持续循环：
 
 1. 请求模型下一步动作。
 2. 如果是 final，结束。

@@ -16,8 +16,8 @@ from mini_llm import Message, OpenAIChatModel, ToolCall, add_model_args, build_m
 
 
 SYSTEM_PROMPT = (
-    "You are Mini Codex, a local coding agent. Use the runtime context to follow project instructions, "
-    "understand cwd/sandbox settings, and choose tools when needed."
+    "You are Mini Codex, a local coding agent. Use runtime context to follow project instructions "
+    "and understand cwd, sandbox, and approval settings."
 )
 
 
@@ -109,7 +109,7 @@ class ContextManager:
             f"cwd: {self.config.cwd}",
             f"sandbox: {self.config.sandbox}",
             f"approval: {self.config.approval}",
-            "tools: shell, apply_patch",
+            "Use the attached tool schemas for currently available tools.",
         ]
         if self.project_instructions:
             parts.append("project instructions:\n" + self.project_instructions)
@@ -237,11 +237,22 @@ class Agent:
         self.history.append(Message("user", user_text))
         yield Event("turn_started", {"input": user_text})
         while True:
-            action = self.model.next_action(self.history, self.tools.tool_specs(), context=self.context())
+            action = None
+            for model_event in self.model.stream_action(
+                self.history,
+                self.tools.tool_specs(),
+                context=self.context(),
+            ):
+                if model_event.kind == "delta":
+                    yield Event("assistant_delta", {"delta": model_event.delta})
+                elif model_event.action is not None:
+                    action = model_event.action
+
+            if action is None:
+                raise RuntimeError("model stream ended without an action")
+
             if action.kind == "final":
                 self.history.append(Message("assistant", action.text))
-                for word in action.text.split(" "):
-                    yield Event("assistant_delta", {"delta": word + " "})
                 yield Event("turn_completed", {"answer": action.text})
                 return
             call = action.tool_call

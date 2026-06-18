@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Step 3: add a shell tool and feed results back to the model."""
 
-from __future__ import annotations
-
 import argparse
 import json
 import subprocess
@@ -12,12 +10,14 @@ from pathlib import Path
 from typing import Iterable
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
-from mini_llm import Message, OpenAIChatModel, ToolCall, add_model_args, build_model, function_tool
-
-
-SYSTEM_PROMPT = (
-    "You are Mini Codex. Answer normally when no local action is needed. "
-    "Use the shell tool when you need to inspect the current directory or run a user-requested command."
+from mini_llm import (
+    Message,
+    ModelAction,
+    OpenAIChatModel,
+    ToolCall,
+    add_model_args,
+    build_model,
+    function_tool,
 )
 
 
@@ -84,11 +84,18 @@ class Agent:
         yield Event("turn_started", {"input": user_text})
 
         while True:
-            action = self.model.next_action(self.history, self.tools.tool_specs())
+            action: ModelAction | None = None
+            for model_event in self.model.stream_action(self.history, self.tools.tool_specs()):
+                if model_event.kind == "delta":
+                    yield Event("assistant_delta", {"delta": model_event.delta})
+                elif model_event.action is not None:
+                    action = model_event.action
+
+            if action is None:
+                raise RuntimeError("model stream ended without an action")
+
             if action.kind == "final":
                 self.history.append(Message("assistant", action.text))
-                for word in action.text.split(" "):
-                    yield Event("assistant_delta", {"delta": word + " "})
                 yield Event("turn_completed", {"answer": action.text})
                 return
 
@@ -149,7 +156,7 @@ def main() -> None:
     add_model_args(parser)
     args = parser.parse_args()
 
-    agent = Agent(build_model(args, SYSTEM_PROMPT), ToolRegistry())
+    agent = Agent(build_model(args), ToolRegistry())
     if args.once is not None:
         run_turn(agent, args.once, args.jsonl)
     else:

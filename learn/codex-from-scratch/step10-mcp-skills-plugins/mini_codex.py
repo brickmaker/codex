@@ -16,8 +16,8 @@ from mini_llm import Message, OpenAIChatModel, ToolCall, add_model_args, build_m
 
 
 SYSTEM_PROMPT = (
-    "You are Mini Codex with skills and MCP-like plugin tools. Use the runtime context to see available skills "
-    "and tools. Call tools when they are useful; otherwise answer directly."
+    "You are Mini Codex with extension support. Use runtime context to understand available capabilities, "
+    "and answer directly when no local action is needed."
 )
 
 
@@ -198,14 +198,22 @@ class Agent:
         self.history.append(Message("user", prompt))
         yield Event("turn_started", {"input": prompt})
         while True:
-            action = self.model.next_action(
+            action = None
+            for model_event in self.model.stream_action(
                 self.history,
                 self.tools.tool_specs(),
                 context=self.context_manager.build(self.history),
-            )
+            ):
+                if model_event.kind == "delta":
+                    yield Event("assistant_delta", {"delta": model_event.delta})
+                elif model_event.action is not None:
+                    action = model_event.action
+
+            if action is None:
+                raise RuntimeError("model stream ended without an action")
+
             if action.kind == "final":
                 self.history.append(Message("assistant", action.text))
-                yield Event("assistant_message", {"text": action.text})
                 yield Event("turn_completed", {"answer": action.text})
                 return
             call = action.tool_call
@@ -222,12 +230,14 @@ def render(events: Iterable[Event], jsonl: bool) -> None:
     for event in events:
         if jsonl:
             print(json.dumps(asdict(event), ensure_ascii=False))
-        elif event.type == "assistant_message":
-            print(event.data["text"])
+        elif event.type == "assistant_delta":
+            print(event.data["delta"], end="", flush=True)
         elif event.type == "tool_call_started":
             print(f"[tool] {event.data['name']} {event.data['arguments']}")
         elif event.type == "tool_call_finished":
             print(event.data["output"])
+        elif event.type == "turn_completed":
+            print()
 
 
 def build_agent(args: argparse.Namespace) -> Agent:
